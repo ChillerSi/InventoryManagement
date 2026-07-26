@@ -9,9 +9,11 @@ app = FastAPI(title="义采通 SigLIP Service")
 processor = AutoProcessor.from_pretrained(MODEL)
 model = AutoModel.from_pretrained(MODEL).eval()
 
+
 @app.get("/health")
 def health():
     return {"status": "ok", "model": MODEL}
+
 
 @app.post("/embed")
 async def embed(file: UploadFile = File(...)):
