@@ -70,7 +70,8 @@ public class ImageController {
    * 接收一张原图和多个原图像素坐标，由服务端逐框裁剪、保存和向量化。
    *
    * <p>坐标原点位于原图左上角，最多允许 20 个框。原图只在 MinIO 和 MySQL 保存一次；裁剪区域仅在内存中用于
-   * SigLIP 建模，不写入 MinIO。每个区域生成独立 Qdrant point，并关联租户、店铺、商品和原图。
+   * SigLIP 建模，不写入 MinIO。每个区域生成独立 Qdrant point，payload 只保存租户和商品主键；店铺与位置从
+   * MySQL 关联查询。
    */
   @PostMapping("/products/{productId}/regions")
   ProductDto uploadRegions(
@@ -124,9 +125,7 @@ public class ImageController {
         EmbeddingResult embedding = vectors.embed(output.toByteArray(), "image/jpeg");
         vectors.index(
             UUID.randomUUID(),
-            sourceImage.getId(),
             sourceImage.getTenantId(),
-            product.getStoreId(),
             productId,
             embedding);
         readyCount++;
@@ -167,10 +166,13 @@ public class ImageController {
         .map(
             h -> {
               UUID id = UUID.fromString((String) h.get("productId"));
-              return Map.<String, Object>of(
-                  "product", map.get(id), "similarity", h.get("similarity"));
+              return new AbstractMap.SimpleEntry<>(map.get(id), h.get("similarity"));
             })
-        .filter(x -> x.get("product") != null)
+        .filter(entry -> entry.getKey() != null)
+        .map(
+            entry ->
+                Map.<String, Object>of(
+                    "product", entry.getKey(), "similarity", entry.getValue()))
         .toList();
   }
 

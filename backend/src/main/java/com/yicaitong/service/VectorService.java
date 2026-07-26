@@ -66,12 +66,10 @@ public class VectorService {
     return new EmbeddingResult(modelVersion, vector);
   }
 
-  /** 将图片向量写入 Qdrant，并保存租户、商品和图片标识作为过滤 payload。 */
+  /** 将图片向量写入 Qdrant；payload 只保留租户隔离字段和 MySQL 商品主键。 */
   public void index(
       UUID pointId,
-      UUID sourceImageId,
       UUID tenantId,
-      UUID storeId,
       UUID productId,
       EmbeddingResult embeddingResult) {
     ensureCollection(embeddingResult.vector().size());
@@ -91,14 +89,8 @@ public class VectorService {
                         Map.of(
                             "tenantId",
                             tenantId.toString(),
-                            "storeId",
-                            storeId.toString(),
                             "productId",
-                            productId.toString(),
-                            "sourceImageId",
-                            sourceImageId.toString(),
-                            "modelVersion",
-                            embeddingResult.modelVersion())))))
+                            productId.toString())))))
         .retrieve()
         .toBodilessEntity();
   }
@@ -128,12 +120,7 @@ public class VectorService {
                                 "key",
                                 "tenantId",
                                 "match",
-                                Map.of("value", tenantId.toString())),
-                            Map.of(
-                                "key",
-                                "modelVersion",
-                                "match",
-                                Map.of("value", embeddingResult.modelVersion()))))))
+                                Map.of("value", tenantId.toString()))))))
             .retrieve()
             .body(JsonNode.class);
     Map<String, Double> bestScoreByProduct = new HashMap<>();

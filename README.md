@@ -94,6 +94,7 @@ Python 服务会按模型 revision 下载权重，并返回完整的 `modelVersi
 
 档案管理支持在一张原图上人工框选最多 20 个商品区域。前端只传原图及各区域的原图像素坐标，
 后端负责逐框裁剪。原图仅在 MinIO 和 MySQL 保存一次，裁剪小图只在内存中送入 SigLIP，
-不会写入 MinIO。每个区域生成独立 Qdrant 向量点，并关联 `tenantId`、`storeId`、
-`productId` 和 `sourceImageId`。这种方式不会依赖 YOLO 等目标检测模型，也避免浏览器缩放
-图片降低 SigLIP 输入质量。
+不会写入 MinIO。每个区域生成独立 Qdrant 向量点，payload 只保存用于多租户隔离的
+`tenantId` 和用于关联 MySQL 的 `productId`。店铺、位置、上下架及删除状态均以 MySQL
+实时数据为准。这种方式不会依赖 YOLO 等目标检测模型，也避免浏览器缩放图片降低 SigLIP
+输入质量。
