@@ -91,3 +91,7 @@ Python 服务会按模型 revision 下载权重，并返回完整的 `modelVersi
 
 升级 SigLIP 模型时必须同时修改 `SIGLIP_MODEL_REVISION` 和
 `QDRANT_COLLECTION`，创建新集合后重新向量化全部商品图片。不得直接把新模型向量写入旧集合。
+
+档案管理支持在一张原图上人工框选最多 20 个商品区域。前端只传原图及各区域的原图像素坐标，
+后端负责逐框裁剪；每个区域分别保存为 MinIO 对象、MySQL 图片记录和 Qdrant 向量点。
+这种方式不会依赖 YOLO 等目标检测模型，也避免浏览器缩放图片降低 SigLIP 输入质量。

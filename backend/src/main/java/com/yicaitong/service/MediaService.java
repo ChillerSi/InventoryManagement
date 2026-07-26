@@ -47,6 +47,18 @@ public class MediaService {
     return key;
   }
 
+  /** 上传后端根据像素坐标裁剪出的图片字节。 */
+  public String put(byte[] bytes, String contentType, String key) throws Exception {
+    client.putObject(
+        PutObjectArgs.builder()
+            .bucket(bucket)
+            .object(key)
+            .stream(new ByteArrayInputStream(bytes), bytes.length, -1)
+            .contentType(contentType)
+            .build());
+    return key;
+  }
+
   /** 尝试删除已被新图片替换的旧对象；清理失败只记录日志，不影响新图片生效。 */
   public void deleteQuietly(String key) {
     if (key == null || key.isBlank()) return;

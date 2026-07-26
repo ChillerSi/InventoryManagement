@@ -24,6 +24,7 @@ type Store = {
   location: string;
   storefrontUrl?: string;
 };
+type SelectionBox = { x: number; y: number; w: number; h: number };
 const user = ref<User | null>(JSON.parse(localStorage.getItem('auth') || 'null')),
   tab = ref('goods'),
   products = ref<Product[]>([]),
@@ -141,13 +142,17 @@ const cropOpen = ref(false),
   cropProduct = ref<Product>(),
   canvas = ref<HTMLCanvasElement>(),
   start = ref({ x: 0, y: 0 }),
-  box = ref({ x: 20, y: 20, w: 180, h: 180 });
+  box = ref<SelectionBox>({ x: 20, y: 20, w: 180, h: 180 }),
+  boxes = ref<SelectionBox[]>([]),
+  imageRect = ref({ x: 0, y: 0, w: 0, h: 0, naturalW: 0, naturalH: 0 });
 function chooseImage(e: Event, mode: 'search' | 'upload', p?: Product) {
   const f = (e.target as HTMLInputElement).files?.[0];
   if (!f) return;
   cropFile.value = f;
   cropMode.value = mode;
   cropProduct.value = p;
+  boxes.value = [];
+  box.value = { x: 20, y: 20, w: 180, h: 180 };
   cropSrc.value = URL.createObjectURL(f);
   cropOpen.value = true;
   nextTick(draw);
@@ -160,9 +165,22 @@ function draw() {
     c.height = 420;
     const scale = Math.min(c.width / img.width, c.height / img.height),
       w = img.width * scale,
-      h = img.height * scale;
-    c.getContext('2d')!.drawImage(img, (c.width - w) / 2, (c.height - h) / 2, w, h);
-    c.getContext('2d')!.strokeRect(box.value.x, box.value.y, box.value.w, box.value.h);
+      h = img.height * scale,
+      x = (c.width - w) / 2,
+      y = (c.height - h) / 2,
+      context = c.getContext('2d')!;
+    imageRect.value = { x, y, w, h, naturalW: img.width, naturalH: img.height };
+    context.drawImage(img, x, y, w, h);
+    context.lineWidth = 2;
+    context.font = '14px sans-serif';
+    boxes.value.forEach((selected, index) => {
+      context.strokeStyle = '#24a148';
+      context.strokeRect(selected.x, selected.y, selected.w, selected.h);
+      context.fillStyle = '#24a148';
+      context.fillText(String(index + 1), selected.x + 5, selected.y + 18);
+    });
+    context.strokeStyle = '#ff6b35';
+    context.strokeRect(box.value.x, box.value.y, box.value.w, box.value.h);
   };
   img.src = cropSrc.value;
 }
@@ -176,7 +194,54 @@ function move(e: MouseEvent) {
   box.value.h = e.offsetY - start.value.y;
   draw();
 }
+function finishBox() {
+  if (cropMode.value !== 'upload') return;
+  const normalized = normalizeBox(box.value);
+  if (normalized.w >= 8 && normalized.h >= 8 && boxes.value.length < 20) {
+    boxes.value.push(normalized);
+    box.value = { x: 0, y: 0, w: 0, h: 0 };
+    draw();
+  }
+}
+function normalizeBox(value: SelectionBox): SelectionBox {
+  const rect = imageRect.value,
+    left = Math.max(rect.x, Math.min(value.x, value.x + value.w)),
+    top = Math.max(rect.y, Math.min(value.y, value.y + value.h)),
+    right = Math.min(rect.x + rect.w, Math.max(value.x, value.x + value.w)),
+    bottom = Math.min(rect.y + rect.h, Math.max(value.y, value.y + value.h));
+  return { x: left, y: top, w: Math.max(0, right - left), h: Math.max(0, bottom - top) };
+}
+function removeBox(index: number) {
+  boxes.value.splice(index, 1);
+  draw();
+}
 async function cropSubmit() {
+  if (cropMode.value === 'upload') {
+    if (!boxes.value.length) return notify('请至少框选一个商品区域');
+    const rect = imageRect.value,
+      regions = boxes.value.map((selected) => {
+        const x = Math.round(((selected.x - rect.x) / rect.w) * rect.naturalW),
+          y = Math.round(((selected.y - rect.y) / rect.h) * rect.naturalH),
+          right = Math.round(((selected.x + selected.w - rect.x) / rect.w) * rect.naturalW),
+          bottom = Math.round(((selected.y + selected.h - rect.y) / rect.h) * rect.naturalH);
+        return { x, y, width: right - x, height: bottom - y };
+      }),
+      fd = new FormData();
+    fd.append('file', cropFile.value!);
+    fd.append('regions', JSON.stringify(regions));
+    try {
+      await api('/images/products/' + cropProduct.value!.id + '/regions', {
+        method: 'POST',
+        body: fd,
+      });
+      await load();
+      cropOpen.value = false;
+      notify(`已完成 ${regions.length} 个区域的向量化`);
+    } catch (error: any) {
+      notify(error.message);
+    }
+    return;
+  }
   const c = canvas.value!,
     b = box.value,
     x = Math.min(b.x, b.x + b.w),
@@ -414,12 +479,25 @@ onMounted(load);
   </div>
   <div v-if="cropOpen" class="modal">
     <section>
-      <h2>框选图片中的当前产品</h2>
-      <p>按住鼠标拖拽矩形，只保留需要建模或检索的商品。</p>
-      <canvas ref="canvas" @mousedown="down" @mousemove="move"></canvas>
+      <h2>{{ cropMode === 'upload' ? '框选多个商品区域' : '框选要搜索的商品' }}</h2>
+      <p>
+        {{
+          cropMode === 'upload'
+            ? '每次拖拽添加一个框，最多 20 个；后端将按原图像素坐标分别裁剪并建模。'
+            : '按住鼠标拖拽矩形，只使用框选区域进行相似图片检索。'
+        }}
+      </p>
+      <canvas ref="canvas" @mousedown="down" @mousemove="move" @mouseup="finishBox"></canvas>
+      <div v-if="cropMode === 'upload' && boxes.length">
+        <button v-for="(_, index) in boxes" :key="index" @click="removeBox(index)">
+          删除区域 {{ index + 1 }}
+        </button>
+      </div>
       <div>
         <button @click="cropOpen = false">取消</button
-        ><button class="primary" @click="cropSubmit">确认框选</button>
+        ><button class="primary" @click="cropSubmit">
+          {{ cropMode === 'upload' ? `确认 ${boxes.length} 个区域` : '确认框选' }}
+        </button>
       </div>
     </section>
   </div>
