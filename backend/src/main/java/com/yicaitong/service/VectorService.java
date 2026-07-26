@@ -68,7 +68,12 @@ public class VectorService {
 
   /** 将图片向量写入 Qdrant，并保存租户、商品和图片标识作为过滤 payload。 */
   public void index(
-      UUID imageId, UUID tenantId, UUID productId, EmbeddingResult embeddingResult) {
+      UUID pointId,
+      UUID sourceImageId,
+      UUID tenantId,
+      UUID storeId,
+      UUID productId,
+      EmbeddingResult embeddingResult) {
     ensureCollection(embeddingResult.vector().size());
     rest.put()
         .uri(qdrant + "/collections/" + collection + "/points?wait=true")
@@ -79,15 +84,19 @@ public class VectorService {
                 List.of(
                     Map.of(
                         "id",
-                        imageId.toString(),
+                        pointId.toString(),
                         "vector",
                         embeddingResult.vector(),
                         "payload",
                         Map.of(
                             "tenantId",
                             tenantId.toString(),
+                            "storeId",
+                            storeId.toString(),
                             "productId",
                             productId.toString(),
+                            "sourceImageId",
+                            sourceImageId.toString(),
                             "modelVersion",
                             embeddingResult.modelVersion())))))
         .retrieve()

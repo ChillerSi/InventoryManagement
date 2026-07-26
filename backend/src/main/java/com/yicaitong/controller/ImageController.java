@@ -21,6 +21,7 @@ import java.io.ByteArrayOutputStream;
 import java.util.*;
 import javax.imageio.ImageIO;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
@@ -28,6 +29,7 @@ import org.springframework.web.multipart.MultipartFile;
 @RestController
 @RequestMapping("/api/images")
 @RequiredArgsConstructor
+@Slf4j
 /** 处理商品图片上传、SigLIP 向量化和 Qdrant 相似图片检索。 */
 public class ImageController {
   private final CatalogController catalog;
@@ -64,37 +66,11 @@ public class ImageController {
     return new StoreDto(store.getId(), store.getName(), store.getLocation(), media.url(objectKey));
   }
 
-  /** 保存用户框选后的商品图片到 MinIO，并同步创建 SigLIP 向量。 向量失败不会回滚图片，状态会标记为 FAILED，便于后续补偿。 */
-  @PostMapping("/products/{productId}")
-  ProductDto upload(@PathVariable UUID productId, @RequestPart MultipartFile file)
-      throws Exception {
-    UserContext.require(Domain.Role.ADMIN);
-    Product p = catalog.owned(productId);
-    validate(file);
-    ProductImage pi = new ProductImage();
-    pi.setTenantId(UserContext.get().tenantId());
-    pi.setProductId(productId);
-    pi.setObjectKey(
-        "tenant/" + pi.getTenantId() + "/product/" + productId + "/" + UUID.randomUUID() + ".jpg");
-    media.put(file, pi.getObjectKey());
-    images.save(pi);
-    try {
-      EmbeddingResult embedding = vectors.embed(file.getBytes(), file.getContentType());
-      vectors.index(pi.getId(), pi.getTenantId(), productId, embedding);
-      pi.setVectorStatus("READY");
-      pi.setModelVersion(embedding.modelVersion());
-    } catch (Exception e) {
-      pi.setVectorStatus("FAILED");
-    }
-    images.save(pi);
-    return catalog.dto(p);
-  }
-
   /**
    * 接收一张原图和多个原图像素坐标，由服务端逐框裁剪、保存和向量化。
    *
-   * <p>坐标原点位于原图左上角，最多允许 20 个框。每个框都会生成独立的 MinIO 对象、MySQL 图片记录和
-   * Qdrant point，并共同关联当前商品。
+   * <p>坐标原点位于原图左上角，最多允许 20 个框。原图只在 MinIO 和 MySQL 保存一次；裁剪区域仅在内存中用于
+   * SigLIP 建模，不写入 MinIO。每个区域生成独立 Qdrant point，并关联租户、店铺、商品和原图。
    */
   @PostMapping("/products/{productId}/regions")
   ProductDto uploadRegions(
@@ -117,7 +93,22 @@ public class ImageController {
     }
     requested.forEach(region -> validateRegion(region, original));
 
-    int sortOrder = 0;
+    ProductImage sourceImage = new ProductImage();
+    sourceImage.setTenantId(UserContext.get().tenantId());
+    sourceImage.setProductId(productId);
+    sourceImage.setObjectKey(
+        "tenant/"
+            + sourceImage.getTenantId()
+            + "/product/"
+            + productId
+            + "/source/"
+            + UUID.randomUUID()
+            + extension(file.getContentType()));
+    media.put(file, sourceImage.getObjectKey());
+    images.save(sourceImage);
+
+    int readyCount = 0;
+    String modelVersion = null;
     for (ImageRegion region : requested) {
       BufferedImage sourceCrop =
           original.getSubimage(region.x(), region.y(), region.width(), region.height());
@@ -129,8 +120,31 @@ public class ImageController {
       graphics.dispose();
       ByteArrayOutputStream output = new ByteArrayOutputStream();
       ImageIO.write(crop, "jpg", output);
-      saveProductCrop(productId, output.toByteArray(), sortOrder++);
+      try {
+        EmbeddingResult embedding = vectors.embed(output.toByteArray(), "image/jpeg");
+        vectors.index(
+            UUID.randomUUID(),
+            sourceImage.getId(),
+            sourceImage.getTenantId(),
+            product.getStoreId(),
+            productId,
+            embedding);
+        readyCount++;
+        modelVersion = embedding.modelVersion();
+      } catch (Exception exception) {
+        log.warn(
+            "商品框选区域向量化失败: tenantId={}, storeId={}, productId={}, sourceImageId={}, region={}",
+            sourceImage.getTenantId(),
+            product.getStoreId(),
+            productId,
+            sourceImage.getId(),
+            region,
+            exception);
+      }
     }
+    sourceImage.setVectorStatus(readyCount == requested.size() ? "READY" : "FAILED");
+    sourceImage.setModelVersion(modelVersion);
+    images.save(sourceImage);
     return catalog.dto(product);
   }
 
@@ -184,32 +198,6 @@ public class ImageController {
     if (invalid) {
       throw new ApiException(HttpStatus.BAD_REQUEST, "框选坐标超出原图范围或区域过小");
     }
-  }
-
-  private void saveProductCrop(UUID productId, byte[] cropBytes, int sortOrder) throws Exception {
-    ProductImage image = new ProductImage();
-    image.setTenantId(UserContext.get().tenantId());
-    image.setProductId(productId);
-    image.setSortOrder(sortOrder);
-    image.setObjectKey(
-        "tenant/"
-            + image.getTenantId()
-            + "/product/"
-            + productId
-            + "/"
-            + UUID.randomUUID()
-            + ".jpg");
-    media.put(cropBytes, "image/jpeg", image.getObjectKey());
-    images.save(image);
-    try {
-      EmbeddingResult embedding = vectors.embed(cropBytes, "image/jpeg");
-      vectors.index(image.getId(), image.getTenantId(), productId, embedding);
-      image.setVectorStatus("READY");
-      image.setModelVersion(embedding.modelVersion());
-    } catch (Exception exception) {
-      image.setVectorStatus("FAILED");
-    }
-    images.save(image);
   }
 
   /** 原图像素坐标，不使用浏览器缩放后的 Canvas 坐标。 */
