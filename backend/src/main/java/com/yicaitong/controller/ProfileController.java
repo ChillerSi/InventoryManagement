@@ -1,5 +1,9 @@
-package com.yicaitong;
+package com.yicaitong.controller;
 
+import com.yicaitong.domain.Domain;
+import com.yicaitong.domain.Domain.User;
+import com.yicaitong.repository.UserRepository;
+import com.yicaitong.security.UserContext;
 import java.util.*;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
@@ -12,7 +16,7 @@ record UserInput(String name, String account, String password, Domain.Role role,
 @RestController
 @RequestMapping("/api/users")
 @RequiredArgsConstructor
-class ProfileController {
+public class ProfileController {
   private final UserRepository users;
 
   @GetMapping

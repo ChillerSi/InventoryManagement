@@ -1,5 +1,13 @@
-package com.yicaitong;
+package com.yicaitong.controller;
 
+import com.yicaitong.domain.Domain;
+import com.yicaitong.domain.Domain.Product;
+import com.yicaitong.domain.Domain.PurchaseOrder;
+import com.yicaitong.domain.Domain.Store;
+import com.yicaitong.repository.ProductRepository;
+import com.yicaitong.repository.PurchaseOrderRepository;
+import com.yicaitong.repository.StoreRepository;
+import com.yicaitong.security.UserContext;
 import java.math.BigDecimal;
 import java.time.*;
 import java.util.*;
@@ -28,7 +36,7 @@ record OrderDto(
 @RestController
 @RequestMapping("/api/purchase-orders")
 @RequiredArgsConstructor
-class PurchaseController {
+public class PurchaseController {
   private final PurchaseOrderRepository orders;
   private final ProductRepository products;
   private final StoreRepository stores;

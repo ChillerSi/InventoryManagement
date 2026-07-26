@@ -1,5 +1,15 @@
-package com.yicaitong;
+package com.yicaitong.controller;
 
+import com.yicaitong.domain.Domain;
+import com.yicaitong.domain.Domain.Product;
+import com.yicaitong.domain.Domain.Store;
+import com.yicaitong.exception.ApiException;
+import com.yicaitong.repository.ProductImageRepository;
+import com.yicaitong.repository.ProductRepository;
+import com.yicaitong.repository.StoreRepository;
+import com.yicaitong.security.CurrentUser;
+import com.yicaitong.security.UserContext;
+import com.yicaitong.service.MediaService;
 import java.math.BigDecimal;
 import java.util.*;
 import lombok.RequiredArgsConstructor;
@@ -26,7 +36,7 @@ record ProductInput(UUID storeId, String name, BigDecimal price, Boolean onSale)
 @RestController
 @RequestMapping("/api")
 @RequiredArgsConstructor
-class CatalogController {
+public class CatalogController {
   private final StoreRepository stores;
   private final ProductRepository products;
   private final ProductImageRepository images;
@@ -134,13 +144,13 @@ class CatalogController {
     products.save(p);
   }
 
-  Product owned(UUID id) {
+  public Product owned(UUID id) {
     return products
         .findByIdAndTenantIdAndDeletedFalse(id, UserContext.get().tenantId())
         .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "商品不存在"));
   }
 
-  ProductDto dto(Product p) {
+  public ProductDto dto(Product p) {
     Store s =
         stores.findByIdAndTenantIdAndDeletedFalse(p.getStoreId(), p.getTenantId()).orElse(null);
     boolean visible =

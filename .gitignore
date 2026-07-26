@@ -8,3 +8,5 @@
 .tools/
 apache-maven-*.zip
 *.tsbuildinfo
+logs/
+backend/logs/

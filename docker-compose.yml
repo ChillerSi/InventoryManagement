@@ -42,7 +42,17 @@ services:
       QDRANT_URL: http://qdrant:6333
       EMBEDDING_URL: http://embedding-service:8000
       IMAGE_SEARCH_THRESHOLD: ${IMAGE_SEARCH_THRESHOLD:-0.55}
+      LOG_PATH: /app/logs
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+      APP_LOG_LEVEL: ${APP_LOG_LEVEL:-INFO}
+      WEB_LOG_LEVEL: ${WEB_LOG_LEVEL:-INFO}
+      SQL_LOG_LEVEL: ${SQL_LOG_LEVEL:-WARN}
+      SQL_BIND_LOG_LEVEL: ${SQL_BIND_LOG_LEVEL:-WARN}
+      LOG_MAX_FILE_SIZE: ${LOG_MAX_FILE_SIZE:-100MB}
+      LOG_MAX_HISTORY: ${LOG_MAX_HISTORY:-30}
+      LOG_TOTAL_SIZE_CAP: ${LOG_TOTAL_SIZE_CAP:-10GB}
     ports: ["8080:8080"]
+    volumes: [./logs:/app/logs]
     depends_on:
       mysql: {condition: service_healthy}
       minio: {condition: service_started}

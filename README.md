@@ -36,3 +36,27 @@
 - ADMIN/BUYER 可查看店铺和档口；OPERATOR/VIEWER 的接口响应会清空这些敏感字段。
 - ADMIN/OPERATOR 可建采购单；ADMIN/BUYER 可完成采购；只有 ADMIN 可维护档案和团队。
 - 当前 token 为数据库会话 token，便于 MVP 立即运行；可后续替换为 JWT + Refresh Token。
+
+## 后端代码结构
+
+```text
+backend/src/main/java/com/yicaitong/
+├─ application/     # Spring Boot 主启动类
+├─ controller/      # REST 接口与请求/响应模型
+├─ domain/          # JPA 实体和业务枚举
+├─ exception/       # 统一业务异常和全局异常处理
+├─ repository/      # Spring Data JPA 数据查询层
+├─ service/         # MinIO、SigLIP、Qdrant 等业务服务
+├─ security/        # 登录会话、租户上下文、权限与异常处理
+└─ logging/         # HTTP 请求链路日志
+```
+
+## 日志
+
+服务同时输出控制台日志和滚动文件日志。默认文件为 `./logs/inventory-api.log`，
+归档文件按日期和 100MB 大小切分，压缩后保留 30 天，总容量上限 10GB。
+每个请求会返回 `X-Request-Id`，日志中可使用同一 ID 串联接口调用和异常堆栈。
+
+可通过 `.env` 中的 `LOG_LEVEL`、`APP_LOG_LEVEL`、`WEB_LOG_LEVEL`、
+`SQL_LOG_LEVEL` 和 `SQL_BIND_LOG_LEVEL` 调整打印级别。生产环境不建议开启
+SQL 参数日志，日志中也禁止写入密码、Token、MinIO 密钥或图片内容。

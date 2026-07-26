@@ -1,5 +1,13 @@
-package com.yicaitong;
+package com.yicaitong.controller;
 
+import com.yicaitong.domain.Domain;
+import com.yicaitong.domain.Domain.Session;
+import com.yicaitong.domain.Domain.Tenant;
+import com.yicaitong.domain.Domain.User;
+import com.yicaitong.exception.ApiException;
+import com.yicaitong.repository.SessionRepository;
+import com.yicaitong.repository.TenantRepository;
+import com.yicaitong.repository.UserRepository;
 import jakarta.transaction.Transactional;
 import jakarta.validation.constraints.*;
 import java.time.LocalDateTime;
@@ -11,7 +19,7 @@ import org.springframework.web.bind.annotation.*;
 @RestController
 @RequestMapping("/api/auth")
 @RequiredArgsConstructor
-class AuthController {
+public class AuthController {
   private final TenantRepository tenants;
   private final UserRepository users;
   private final SessionRepository sessions;

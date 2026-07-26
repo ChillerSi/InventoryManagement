@@ -1,5 +1,13 @@
-package com.yicaitong;
+package com.yicaitong.controller;
 
+import com.yicaitong.domain.Domain;
+import com.yicaitong.domain.Domain.Product;
+import com.yicaitong.domain.Domain.ProductImage;
+import com.yicaitong.repository.ProductImageRepository;
+import com.yicaitong.repository.ProductRepository;
+import com.yicaitong.security.UserContext;
+import com.yicaitong.service.MediaService;
+import com.yicaitong.service.VectorService;
 import java.util.*;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
@@ -8,7 +16,7 @@ import org.springframework.web.multipart.MultipartFile;
 @RestController
 @RequestMapping("/api/images")
 @RequiredArgsConstructor
-class ImageController {
+public class ImageController {
   private final CatalogController catalog;
   private final ProductImageRepository images;
   private final ProductRepository products;
