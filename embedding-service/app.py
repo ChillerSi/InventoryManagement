@@ -5,8 +5,8 @@ from PIL import Image, ImageOps
 import torch
 from transformers import AutoModel, AutoProcessor
 
-MODEL = os.getenv("SIGLIP_MODEL", "google/siglip-base-patch16-224")
-MODEL_REVISION = os.getenv("SIGLIP_MODEL_REVISION", "7fd15f0689c79d79e38b1c2e2e2370a7bf2761ed")
+MODEL = os.getenv("SIGLIP_MODEL", "google/siglip2-base-patch16-224")
+MODEL_REVISION = os.getenv("SIGLIP_MODEL_REVISION", "75de2d55ec2d0b4efc50b3e9ad70dba96a7b2fa2")
 MODEL_VERSION = f"{MODEL}@{MODEL_REVISION}"
 app = FastAPI(title="义采通 SigLIP Service")
 processor = AutoProcessor.from_pretrained(MODEL, revision=MODEL_REVISION)

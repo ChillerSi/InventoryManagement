@@ -81,8 +81,8 @@ SQL 参数日志，日志中也禁止写入密码、Token、MinIO 密钥或图�
 | MinIO Server | `RELEASE.2025-10-15T17-29-55Z` |
 | MinIO Java SDK | `8.5.17` |
 | Qdrant | `v1.18.2` |
-| SigLIP 模型 | `google/siglip-base-patch16-224` |
-| SigLIP 权重 revision | `7fd15f0689c79d79e38b1c2e2e2370a7bf2761ed` |
+| SigLIP 模型 | `google/siglip2-base-patch16-224` |
+| SigLIP 权重 revision | `75de2d55ec2d0b4efc50b3e9ad70dba96a7b2fa2` |
 | Transformers / PyTorch | `4.53.0` / `2.7.1` |
 
 Python 服务会按模型 revision 下载权重，并返回完整的 `modelVersion`。Java
