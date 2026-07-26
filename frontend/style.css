@@ -225,15 +225,46 @@ nav button.active {
   margin-top: 16px;
 }
 .stores {
-  display: flex;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
   gap: 8px;
-  flex-wrap: wrap;
   margin-bottom: 16px;
 }
-.stores span {
+.store-card {
+  display: grid;
+  grid-template-columns: 86px 1fr;
+  gap: 12px;
+  align-items: center;
+  background: white;
+  border: 1px solid var(--line);
+  padding: 10px;
+  border-radius: 14px;
+}
+.store-card small {
+  display: block;
+  margin: 5px 0 10px;
+}
+.store-card label {
+  color: var(--green);
+  font-size: 13px;
+  font-weight: bold;
+  cursor: pointer;
+}
+.storefront {
+  width: 86px;
+  height: 74px;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  border-radius: 10px;
   background: #e8eddc;
-  padding: 8px 12px;
-  border-radius: 20px;
+  color: var(--muted);
+  font-size: 12px;
+}
+.storefront img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
 }
 .modal {
   position: fixed;

@@ -3,13 +3,17 @@ package com.yicaitong.controller;
 import com.yicaitong.domain.Domain;
 import com.yicaitong.domain.Domain.Product;
 import com.yicaitong.domain.Domain.ProductImage;
+import com.yicaitong.domain.Domain.Store;
+import com.yicaitong.exception.ApiException;
 import com.yicaitong.repository.ProductImageRepository;
 import com.yicaitong.repository.ProductRepository;
+import com.yicaitong.repository.StoreRepository;
 import com.yicaitong.security.UserContext;
 import com.yicaitong.service.MediaService;
 import com.yicaitong.service.VectorService;
 import java.util.*;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -21,8 +25,35 @@ public class ImageController {
   private final CatalogController catalog;
   private final ProductImageRepository images;
   private final ProductRepository products;
+  private final StoreRepository stores;
   private final MediaService media;
   private final VectorService vectors;
+
+  /** 上传并替换店铺唯一门头图片。该图片只保存到 MinIO，不进入 SigLIP 和 Qdrant。 数据库仅保存对象键，替换成功后异步语义地清理旧对象。 */
+  @PostMapping("/stores/{storeId}/storefront")
+  StoreDto uploadStorefront(@PathVariable UUID storeId, @RequestPart MultipartFile file)
+      throws Exception {
+    UserContext.require(Domain.Role.ADMIN);
+    validate(file);
+    Store store =
+        stores
+            .findByIdAndTenantIdAndDeletedFalse(storeId, UserContext.get().tenantId())
+            .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "店铺不存在"));
+    String oldObjectKey = store.getStorefrontObjectKey();
+    String objectKey =
+        "tenant/"
+            + store.getTenantId()
+            + "/store/"
+            + storeId
+            + "/storefront/"
+            + UUID.randomUUID()
+            + extension(file.getContentType());
+    media.put(file, objectKey);
+    store.setStorefrontObjectKey(objectKey);
+    stores.save(store);
+    media.deleteQuietly(oldObjectKey);
+    return new StoreDto(store.getId(), store.getName(), store.getLocation(), media.url(objectKey));
+  }
 
   /** 保存用户框选后的商品图片到 MinIO，并同步创建 SigLIP 向量。 向量失败不会回滚图片，状态会标记为 FAILED，便于后续补偿。 */
   @PostMapping("/products/{productId}")
@@ -79,5 +110,13 @@ public class ImageController {
   void validate(MultipartFile f) {
     if (f.isEmpty() || f.getContentType() == null || !f.getContentType().startsWith("image/"))
       throw new IllegalArgumentException("只允许上传图片");
+  }
+
+  private String extension(String contentType) {
+    return switch (contentType) {
+      case "image/png" -> ".png";
+      case "image/webp" -> ".webp";
+      default -> ".jpg";
+    };
   }
 }

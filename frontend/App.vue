@@ -18,11 +18,17 @@ type Product = {
   storeLocation?: string;
   images: string[];
 };
+type Store = {
+  id: string;
+  name: string;
+  location: string;
+  storefrontUrl?: string;
+};
 const user = ref<User | null>(JSON.parse(localStorage.getItem('auth') || 'null')),
   tab = ref('goods'),
   products = ref<Product[]>([]),
   orders = ref<any[]>([]),
-  stores = ref<any[]>([]),
+  stores = ref<Store[]>([]),
   q = ref(''),
   message = ref('');
 const authMode = ref<'login' | 'register'>('login'),
@@ -108,6 +114,24 @@ async function createProduct() {
     });
     tab.value = 'archive';
     load();
+  }
+}
+async function uploadStorefront(event: Event, store: Store) {
+  const file = (event.target as HTMLInputElement).files?.[0];
+  if (!file) return;
+  const form = new FormData();
+  form.append('file', file);
+  try {
+    const updated = await api(`/images/stores/${store.id}/storefront`, {
+      method: 'POST',
+      body: form,
+    });
+    stores.value = stores.value.map((item) => (item.id === store.id ? updated : item));
+    notify('店铺门头图片已更新');
+  } catch (error: any) {
+    notify(error.message);
+  } finally {
+    (event.target as HTMLInputElement).value = '';
   }
 }
 const cropOpen = ref(false),
@@ -305,7 +329,24 @@ onMounted(load);
           </div>
         </div>
         <div class="stores">
-          <span v-for="s in stores" :key="s.id">{{ s.location }} · {{ s.name }}</span>
+          <article v-for="s in stores" :key="s.id" class="store-card">
+            <div class="storefront">
+              <img v-if="s.storefrontUrl" :src="s.storefrontUrl" :alt="`${s.name}门头图片`" />
+              <span v-else>暂无门头图</span>
+            </div>
+            <div>
+              <strong>{{ s.name }}</strong>
+              <small>{{ s.location }}</small>
+              <label v-if="user.role === 'ADMIN'"
+                >{{ s.storefrontUrl ? '替换门头图片' : '上传门头图片'
+                }}<input
+                  hidden
+                  type="file"
+                  accept="image/jpeg,image/png,image/webp"
+                  @change="uploadStorefront($event, s)"
+              /></label>
+            </div>
+          </article>
         </div>
         <div class="grid">
           <article v-for="p in products" :key="p.id">

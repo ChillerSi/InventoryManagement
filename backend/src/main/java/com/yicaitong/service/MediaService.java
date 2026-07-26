@@ -6,12 +6,14 @@ import jakarta.annotation.PostConstruct;
 import java.io.*;
 import java.util.concurrent.TimeUnit;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
 @Service
 @RequiredArgsConstructor
+@Slf4j
 /** 封装 MinIO Bucket 初始化、私有对象上传和短时下载地址签发。 */
 public class MediaService {
   @Value("${app.minio.endpoint}")
@@ -43,6 +45,16 @@ public class MediaService {
             .contentType(file.getContentType())
             .build());
     return key;
+  }
+
+  /** 尝试删除已被新图片替换的旧对象；清理失败只记录日志，不影响新图片生效。 */
+  public void deleteQuietly(String key) {
+    if (key == null || key.isBlank()) return;
+    try {
+      client.removeObject(RemoveObjectArgs.builder().bucket(bucket).object(key).build());
+    } catch (Exception exception) {
+      log.warn("MinIO 旧图片清理失败: objectKey={}", key, exception);
+    }
   }
 
   /** 为私有对象生成一小时有效的 GET 预签名地址；数据库不会持久化该地址。 */
