@@ -11,6 +11,7 @@ import com.yicaitong.repository.StoreRepository;
 import com.yicaitong.security.UserContext;
 import com.yicaitong.service.MediaService;
 import com.yicaitong.service.VectorService;
+import com.yicaitong.service.VectorService.EmbeddingResult;
 import java.util.*;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -70,10 +71,10 @@ public class ImageController {
     media.put(file, pi.getObjectKey());
     images.save(pi);
     try {
-      List<Double> v = vectors.embed(file.getBytes(), file.getContentType());
-      vectors.index(pi.getId(), pi.getTenantId(), productId, v);
+      EmbeddingResult embedding = vectors.embed(file.getBytes(), file.getContentType());
+      vectors.index(pi.getId(), pi.getTenantId(), productId, embedding);
       pi.setVectorStatus("READY");
-      pi.setModelVersion("siglip");
+      pi.setModelVersion(embedding.modelVersion());
     } catch (Exception e) {
       pi.setVectorStatus("FAILED");
     }

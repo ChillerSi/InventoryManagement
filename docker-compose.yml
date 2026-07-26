@@ -14,7 +14,7 @@ services:
       timeout: 5s
       retries: 30
   minio:
-    image: minio/minio:latest
+    image: ${MINIO_IMAGE:-minio/minio:RELEASE.2025-10-15T17-29-55Z}
     command: server /data --console-address ":9001"
     environment:
       MINIO_ROOT_USER: ${MINIO_ROOT_USER:-minioadmin}
@@ -22,14 +22,17 @@ services:
     ports: ["9000:9000", "9001:9001"]
     volumes: [minio-data:/data]
   qdrant:
-    image: qdrant/qdrant:latest
+    image: ${QDRANT_IMAGE:-qdrant/qdrant:v1.18.2}
     ports: ["6333:6333"]
     volumes: [qdrant-data:/qdrant/storage]
   embedding-service:
     build: ./embedding-service
     environment:
       SIGLIP_MODEL: ${SIGLIP_MODEL:-google/siglip-base-patch16-224}
+      SIGLIP_MODEL_REVISION: ${SIGLIP_MODEL_REVISION:-7fd15f0689c79d79e38b1c2e2e2370a7bf2761ed}
+      HF_HOME: /models/huggingface
     ports: ["8000:8000"]
+    volumes: [siglip-models:/models/huggingface]
   backend:
     build: ./backend
     environment:
@@ -41,6 +44,8 @@ services:
       MINIO_SECRET_KEY: ${MINIO_ROOT_PASSWORD:-minioadmin}
       QDRANT_URL: http://qdrant:6333
       EMBEDDING_URL: http://embedding-service:8000
+      SIGLIP_MODEL_VERSION: ${SIGLIP_MODEL:-google/siglip-base-patch16-224}@${SIGLIP_MODEL_REVISION:-7fd15f0689c79d79e38b1c2e2e2370a7bf2761ed}
+      QDRANT_COLLECTION: ${QDRANT_COLLECTION:-products_siglip_base_patch16_224_7fd15f06}
       IMAGE_SEARCH_THRESHOLD: ${IMAGE_SEARCH_THRESHOLD:-0.55}
       LOG_PATH: /app/logs
       LOG_LEVEL: ${LOG_LEVEL:-INFO}
@@ -66,3 +71,4 @@ volumes:
   mysql-data:
   minio-data:
   qdrant-data:
+  siglip-models:

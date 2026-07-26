@@ -40,4 +40,6 @@ app:
     bucket: inventory-images
   qdrant-url: ${QDRANT_URL:http://localhost:6333}
   embedding-url: ${EMBEDDING_URL:http://localhost:8000}
+  embedding-model-version: ${SIGLIP_MODEL_VERSION:google/siglip-base-patch16-224@7fd15f0689c79d79e38b1c2e2e2370a7bf2761ed}
+  qdrant-collection: ${QDRANT_COLLECTION:products_siglip_base_patch16_224_7fd15f06}
   search-threshold: ${IMAGE_SEARCH_THRESHOLD:0.55}

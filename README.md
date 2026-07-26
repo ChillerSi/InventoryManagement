@@ -71,3 +71,23 @@ SQL 参数日志，日志中也禁止写入密码、Token、MinIO 密钥或图�
 已经在任何环境执行过的迁移文件不可修改。后续结构变更应新增
 `V2__描述.sql`、`V3__描述.sql` 等版本文件。Hibernate 只执行结构校验，
 不会再使用 `ddl-auto=update` 自动修改生产数据库。
+
+## 向量兼容性与版本锁定
+
+以下版本已在代码和 `docker-compose.yml` 中固定，禁止在生产环境使用 `latest`：
+
+| 组件 | 固定版本 |
+|---|---|
+| MinIO Server | `RELEASE.2025-10-15T17-29-55Z` |
+| MinIO Java SDK | `8.5.17` |
+| Qdrant | `v1.18.2` |
+| SigLIP 模型 | `google/siglip-base-patch16-224` |
+| SigLIP 权重 revision | `7fd15f0689c79d79e38b1c2e2e2370a7bf2761ed` |
+| Transformers / PyTorch | `4.53.0` / `2.7.1` |
+
+Python 服务会按模型 revision 下载权重，并返回完整的 `modelVersion`。Java
+服务会校验该版本，并将版本写入 MySQL 和 Qdrant payload；Qdrant 集合名称也包含模型版本。
+因此配置不一致时请求会直接失败，不会把不兼容向量写入已有集合。
+
+升级 SigLIP 模型时必须同时修改 `SIGLIP_MODEL_REVISION` 和
+`QDRANT_COLLECTION`，创建新集合后重新向量化全部商品图片。不得直接把新模型向量写入旧集合。
