@@ -7,6 +7,7 @@ import java.util.Optional;
 import java.util.UUID;
 import org.springframework.data.jpa.repository.JpaRepository;
 
+/** 采购单数据访问接口，支持按创建日和实际完成日合并查询。 */
 public interface PurchaseOrderRepository extends JpaRepository<PurchaseOrder, UUID> {
   List<PurchaseOrder>
       findByTenantIdAndCreatedAtBetweenOrTenantIdAndCompletedAtBetweenOrderByCreatedAtDesc(

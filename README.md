@@ -60,3 +60,14 @@ backend/src/main/java/com/yicaitong/
 可通过 `.env` 中的 `LOG_LEVEL`、`APP_LOG_LEVEL`、`WEB_LOG_LEVEL`、
 `SQL_LOG_LEVEL` 和 `SQL_BIND_LOG_LEVEL` 调整打印级别。生产环境不建议开启
 SQL 参数日志，日志中也禁止写入密码、Token、MinIO 密钥或图片内容。
+
+## 数据库迁移
+
+数据库结构由 Flyway 管理，迁移文件位于
+`backend/src/main/resources/db/migration`。首次启动会执行
+`V1__initialize_inventory_schema.sql`，创建业务表、字段注释、查询索引、
+外键约束、数据检查约束和过期会话清理存储过程。
+
+已经在任何环境执行过的迁移文件不可修改。后续结构变更应新增
+`V2__描述.sql`、`V3__描述.sql` 等版本文件。Hibernate 只执行结构校验，
+不会再使用 `ddl-auto=update` 自动修改生产数据库。

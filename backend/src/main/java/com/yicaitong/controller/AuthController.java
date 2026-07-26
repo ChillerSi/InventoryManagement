@@ -19,6 +19,7 @@ import org.springframework.web.bind.annotation.*;
 @RestController
 @RequestMapping("/api/auth")
 @RequiredArgsConstructor
+/** 提供租户主账号注册和统一账号登录接口，并签发服务端会话令牌。 */
 public class AuthController {
   private final TenantRepository tenants;
   private final UserRepository users;
@@ -34,6 +35,7 @@ public class AuthController {
 
   record AuthView(String token, UUID userId, String name, String company, Domain.Role role) {}
 
+  /** 创建新租户及其唯一主账号。账号全局唯一，整个过程在同一事务内完成。 */
   @PostMapping("/register")
   @Transactional
   AuthView register(@RequestBody Register r) {
@@ -57,6 +59,7 @@ public class AuthController {
     return issue(u, t.getName());
   }
 
+  /** 校验账号状态和密码，成功后签发七天有效的随机会话令牌。 */
   @PostMapping("/login")
   AuthView login(@RequestBody Login r) {
     User u =

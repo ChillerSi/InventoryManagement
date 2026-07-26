@@ -36,11 +36,13 @@ record OrderDto(
 @RestController
 @RequestMapping("/api/purchase-orders")
 @RequiredArgsConstructor
+/** 提供采购任务创建、跨天查询、修改、完成和删除接口，并执行对应角色权限。 */
 public class PurchaseController {
   private final PurchaseOrderRepository orders;
   private final ProductRepository products;
   private final StoreRepository stores;
 
+  /** 合并指定日期创建及指定日期完成的采购单，用订单 ID 去重后返回。 */
   @GetMapping
   List<OrderDto> list(@RequestParam(required = false) LocalDate date) {
     LocalDate d = date == null ? LocalDate.now() : date;
@@ -54,6 +56,7 @@ public class PurchaseController {
         .toList();
   }
 
+  /** 创建待采购任务，同时保存商品、店铺和档口信息快照。 */
   @PostMapping
   OrderDto create(@RequestBody OrderInput in) {
     UserContext.require(Domain.Role.ADMIN, Domain.Role.OPERATOR);
@@ -79,6 +82,7 @@ public class PurchaseController {
     return dto(o);
   }
 
+  /** 修改未完成采购单的计划数量和运营备注。 */
   @PatchMapping("/{id}")
   OrderDto edit(@PathVariable UUID id, @RequestBody OrderInput in) {
     UserContext.require(Domain.Role.ADMIN, Domain.Role.OPERATOR);
@@ -90,6 +94,7 @@ public class PurchaseController {
     return dto(o);
   }
 
+  /** 由管理员或买手填写实采数量、实采价格并完成采购。 */
   @PostMapping("/{id}/complete")
   OrderDto complete(@PathVariable UUID id, @RequestBody CompleteInput in) {
     UserContext.require(Domain.Role.ADMIN, Domain.Role.BUYER);
@@ -104,6 +109,7 @@ public class PurchaseController {
     return dto(o);
   }
 
+  /** 删除尚未完成的采购任务；已完成记录不允许直接删除。 */
   @DeleteMapping("/{id}")
   void delete(@PathVariable UUID id) {
     UserContext.require(Domain.Role.ADMIN, Domain.Role.OPERATOR);

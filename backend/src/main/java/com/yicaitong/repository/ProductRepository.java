@@ -6,6 +6,7 @@ import java.util.Optional;
 import java.util.UUID;
 import org.springframework.data.jpa.repository.JpaRepository;
 
+/** 商品列表及租户归属校验查询接口。 */
 public interface ProductRepository extends JpaRepository<Product, UUID> {
   List<Product> findByTenantIdAndDeletedFalseAndOnSaleTrueOrderByIdDesc(UUID tenantId);
 

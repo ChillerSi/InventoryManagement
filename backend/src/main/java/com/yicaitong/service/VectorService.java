@@ -14,6 +14,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestClient;
 
 @Service
+/** 封装 SigLIP 向量服务和 Qdrant 索引、检索调用，不承担业务权限判断。 */
 public class VectorService {
   @Value("${app.qdrant-url}")
   String qdrant;
@@ -26,6 +27,7 @@ public class VectorService {
 
   private final RestClient rest = RestClient.create();
 
+  /** 调用 Python SigLIP 服务，将裁剪后的图片转换为归一化向量。 */
   public List<Double> embed(byte[] bytes, String contentType) {
     MultipartBodyBuilder builder = new MultipartBodyBuilder();
     builder
@@ -50,6 +52,7 @@ public class VectorService {
     return result;
   }
 
+  /** 将图片向量写入 Qdrant，并保存租户、商品和图片标识作为过滤 payload。 */
   public void index(UUID imageId, UUID tenantId, UUID productId, List<Double> vector) {
     ensureCollection(vector.size());
     rest.put()
@@ -71,6 +74,7 @@ public class VectorService {
         .toBodilessEntity();
   }
 
+  /** 在 Qdrant 中强制按 tenantId 过滤并按商品聚合最高相似度。 */
   public List<Map<String, Object>> search(UUID tenantId, List<Double> vector, int top) {
     JsonNode response =
         rest.post()

@@ -36,12 +36,14 @@ record ProductInput(UUID storeId, String name, BigDecimal price, Boolean onSale)
 @RestController
 @RequestMapping("/api")
 @RequiredArgsConstructor
+/** 管理供应商店铺和商品档案，并负责按角色隐藏店铺名称、档口位置等敏感字段。 */
 public class CatalogController {
   private final StoreRepository stores;
   private final ProductRepository products;
   private final ProductImageRepository images;
   private final MediaService media;
 
+  /** 查询当前租户的有效店铺，仅管理员和买手可以访问。 */
   @GetMapping("/stores")
   List<StoreDto> stores() {
     UserContext.require(Domain.Role.ADMIN, Domain.Role.BUYER);
@@ -55,6 +57,7 @@ public class CatalogController {
         .toList();
   }
 
+  /** 在当前租户中新建供应商店铺，仅管理员可以操作。 */
   @PostMapping("/stores")
   StoreDto createStore(@RequestBody StoreInput in) {
     UserContext.require(Domain.Role.ADMIN);
@@ -66,6 +69,7 @@ public class CatalogController {
     return new StoreDto(s.getId(), s.getName(), s.getLocation(), null);
   }
 
+  /** 软删除店铺及其关联商品，保留采购单中的历史快照。 */
   @DeleteMapping("/stores/{id}")
   void deleteStore(@PathVariable UUID id) {
     UserContext.require(Domain.Role.ADMIN);
@@ -82,6 +86,7 @@ public class CatalogController {
             });
   }
 
+  /** 按商品名、店铺名或档口位置搜索商品；无权限角色不会收到供应商敏感字段。 */
   @GetMapping("/products")
   List<ProductDto> products(
       @RequestParam(defaultValue = "") String q,
@@ -108,6 +113,7 @@ public class CatalogController {
         .toList();
   }
 
+  /** 为当前租户创建商品档案，并校验目标店铺的租户归属。 */
   @PostMapping("/products")
   ProductDto create(@RequestBody ProductInput in) {
     UserContext.require(Domain.Role.ADMIN);
@@ -125,6 +131,7 @@ public class CatalogController {
     return dto(p);
   }
 
+  /** 修改商品名称、价格或上下架状态，仅管理员可以操作。 */
   @PatchMapping("/products/{id}")
   ProductDto update(@PathVariable UUID id, @RequestBody ProductInput in) {
     UserContext.require(Domain.Role.ADMIN);
@@ -136,6 +143,7 @@ public class CatalogController {
     return dto(p);
   }
 
+  /** 软删除商品，使其不再出现在选品中心和以图搜图结果中。 */
   @DeleteMapping("/products/{id}")
   void delete(@PathVariable UUID id) {
     UserContext.require(Domain.Role.ADMIN);

@@ -16,6 +16,7 @@ import org.springframework.web.filter.OncePerRequestFilter;
 
 @Component
 @RequiredArgsConstructor
+/** 校验 Bearer 会话令牌，并从数据库会话构建不可由客户端覆盖的租户上下文。 */
 public class AuthFilter extends OncePerRequestFilter {
   private final SessionRepository sessions;
 

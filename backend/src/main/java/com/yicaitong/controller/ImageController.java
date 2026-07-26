@@ -16,6 +16,7 @@ import org.springframework.web.multipart.MultipartFile;
 @RestController
 @RequestMapping("/api/images")
 @RequiredArgsConstructor
+/** 处理商品图片上传、SigLIP 向量化和 Qdrant 相似图片检索。 */
 public class ImageController {
   private final CatalogController catalog;
   private final ProductImageRepository images;
@@ -23,6 +24,7 @@ public class ImageController {
   private final MediaService media;
   private final VectorService vectors;
 
+  /** 保存用户框选后的商品图片到 MinIO，并同步创建 SigLIP 向量。 向量失败不会回滚图片，状态会标记为 FAILED，便于后续补偿。 */
   @PostMapping("/products/{productId}")
   ProductDto upload(@PathVariable UUID productId, @RequestPart MultipartFile file)
       throws Exception {
@@ -48,6 +50,7 @@ public class ImageController {
     return catalog.dto(p);
   }
 
+  /** 对框选后的查询图片建模，在当前租户和上架商品范围内返回相似度最高的 20 个商品。 */
   @PostMapping("/search")
   List<Map<String, Object>> search(
       @RequestPart MultipartFile file, @RequestParam(defaultValue = "20") int top)

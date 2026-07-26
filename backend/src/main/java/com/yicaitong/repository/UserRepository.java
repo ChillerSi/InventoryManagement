@@ -6,6 +6,7 @@ import java.util.Optional;
 import java.util.UUID;
 import org.springframework.data.jpa.repository.JpaRepository;
 
+/** 用户账号查询接口，包含全局账号登录和租户团队列表查询。 */
 public interface UserRepository extends JpaRepository<User, UUID> {
   Optional<User> findByLoginAccountIgnoreCase(String account);
 

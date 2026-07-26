@@ -17,6 +17,7 @@ import org.springframework.web.filter.OncePerRequestFilter;
 @Slf4j
 @Component
 @Order(Ordered.HIGHEST_PRECEDENCE)
+/** 为每个 HTTP 请求生成或透传 Request ID，并记录状态码、耗时和客户端地址。 */
 public class RequestLoggingFilter extends OncePerRequestFilter {
   private static final String REQUEST_ID_HEADER = "X-Request-Id";
   private static final String REQUEST_ID_MDC_KEY = "requestId";

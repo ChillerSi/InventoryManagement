@@ -16,9 +16,11 @@ record UserInput(String name, String account, String password, Domain.Role role,
 @RestController
 @RequestMapping("/api/users")
 @RequiredArgsConstructor
+/** 管理当前租户的团队子账号；主账号不可停用、变更角色或删除。 */
 public class ProfileController {
   private final UserRepository users;
 
+  /** 查询当前租户的主账号和全部子账号，仅管理员可以访问。 */
   @GetMapping
   List<UserDto> list() {
     UserContext.require(Domain.Role.ADMIN);
@@ -27,6 +29,7 @@ public class ProfileController {
         .toList();
   }
 
+  /** 创建运营、买手或查看者子账号，不允许创建第二个管理员。 */
   @PostMapping
   UserDto create(@RequestBody UserInput in) {
     UserContext.require(Domain.Role.ADMIN);
@@ -42,6 +45,7 @@ public class ProfileController {
     return dto(u);
   }
 
+  /** 修改子账号姓名、密码、角色或启用状态。 */
   @PatchMapping("/{id}")
   UserDto edit(@PathVariable UUID id, @RequestBody UserInput in) {
     UserContext.require(Domain.Role.ADMIN);
@@ -59,6 +63,7 @@ public class ProfileController {
     return dto(u);
   }
 
+  /** 删除当前租户的子账号，主账号受到服务端保护。 */
   @DeleteMapping("/{id}")
   void delete(@PathVariable UUID id) {
     UserContext.require(Domain.Role.ADMIN);

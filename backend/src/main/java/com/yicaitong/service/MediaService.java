@@ -12,6 +12,7 @@ import org.springframework.web.multipart.MultipartFile;
 
 @Service
 @RequiredArgsConstructor
+/** 封装 MinIO Bucket 初始化、私有对象上传和短时下载地址签发。 */
 public class MediaService {
   @Value("${app.minio.endpoint}")
   String endpoint;
@@ -34,6 +35,7 @@ public class MediaService {
       client.makeBucket(MakeBucketArgs.builder().bucket(bucket).build());
   }
 
+  /** 将图片写入由服务端生成的租户隔离对象键。 */
   public String put(MultipartFile file, String key) throws Exception {
     client.putObject(
         PutObjectArgs.builder().bucket(bucket).object(key).stream(
@@ -43,6 +45,7 @@ public class MediaService {
     return key;
   }
 
+  /** 为私有对象生成一小时有效的 GET 预签名地址；数据库不会持久化该地址。 */
   public String url(String key) {
     if (key == null) return null;
     try {

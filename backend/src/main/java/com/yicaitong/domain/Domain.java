@@ -6,9 +6,11 @@ import java.time.*;
 import java.util.*;
 import lombok.*;
 
+/** 集中定义当前 MVP 的持久化实体和稳定业务枚举。 */
 public final class Domain {
   private Domain() {}
 
+  /** 系统角色；权限判断必须在后端完成，不能仅依赖前端隐藏按钮。 */
   public enum Role {
     ADMIN,
     OPERATOR,
@@ -16,12 +18,14 @@ public final class Domain {
     VIEWER
   }
 
+  /** 采购单生命周期状态。 */
   public enum OrderStatus {
     PENDING,
     COMPLETED,
     CANCELLED
   }
 
+  /** 独立采购后台，是所有业务数据的租户隔离根节点。 */
   @Entity
   @Table(name = "tenants")
   @Getter
@@ -38,6 +42,7 @@ public final class Domain {
     LocalDateTime createdAt = LocalDateTime.now();
   }
 
+  /** 主账号或子账号；loginAccount 在全局范围内唯一。 */
   @Entity
   @Table(
       name = "users",
@@ -70,6 +75,7 @@ public final class Domain {
     boolean owner;
   }
 
+  /** 服务端登录会话；Token 到期或账号删除后不可继续使用。 */
   @Entity
   @Table(name = "sessions")
   @Getter
@@ -90,6 +96,7 @@ public final class Domain {
     LocalDateTime expiresAt;
   }
 
+  /** 供应商店铺和档口档案。 */
   @Entity
   @Table(name = "stores")
   @Getter
@@ -113,6 +120,7 @@ public final class Domain {
     boolean deleted;
   }
 
+  /** 商品结构化档案；图片和向量由独立实体及外部存储管理。 */
   @Entity
   @Table(name = "products")
   @Getter
@@ -140,6 +148,7 @@ public final class Domain {
     long totalPurchasedQty;
   }
 
+  /** 商品图片元数据；对象正文位于 MinIO，向量位于 Qdrant。 */
   @Entity
   @Table(name = "product_images")
   @Getter
@@ -164,6 +173,7 @@ public final class Domain {
     int sortOrder;
   }
 
+  /** 采购任务及实采结果，同时保存关键字段快照以保证历史可读。 */
   @Entity
   @Table(name = "purchase_orders")
   @Getter
