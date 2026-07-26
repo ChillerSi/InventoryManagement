@@ -1,0 +1,10 @@
+.env
+.idea/
+**/target/
+**/node_modules/
+**/dist/
+**/__pycache__/
+*.iml
+.tools/
+apache-maven-*.zip
+*.tsbuildinfo
