@@ -1,5 +1,10 @@
 <script setup lang="ts">
 import { computed, nextTick, onMounted, ref } from 'vue';
+import ArchivesPage from './src/pages/archives/ArchivesPage.vue';
+import AuthPage from './src/pages/auth/AuthPage.vue';
+import ProfilePage from './src/pages/profile/ProfilePage.vue';
+import PurchasesPage from './src/pages/purchases/PurchasesPage.vue';
+import SelectionPage from './src/pages/selection/SelectionPage.vue';
 type User = {
   token: string;
   userId: string;
@@ -25,7 +30,7 @@ type Store = {
   storefrontUrl?: string;
 };
 type SelectionBox = { x: number; y: number; w: number; h: number };
-const user = ref<User | null>(JSON.parse(localStorage.getItem('auth') || 'null')),
+const user = ref<User>(JSON.parse(localStorage.getItem('auth') || 'null') as User),
   tab = ref('goods'),
   products = ref<Product[]>([]),
   orders = ref<any[]>([]),
@@ -34,6 +39,34 @@ const user = ref<User | null>(JSON.parse(localStorage.getItem('auth') || 'null')
   message = ref('');
 const authMode = ref<'login' | 'register'>('login'),
   auth = ref({ company: '', name: '', account: '', password: '' });
+const dialog = ref<'buy' | 'complete' | 'store' | 'product' | null>(null),
+  activeProduct = ref<Product>(),
+  activeOrder = ref<any>(),
+  form = ref({ name: '', location: '', price: 0, qty: 100, actualPrice: 0, remark: '' });
+const routeByTab: Record<string, string> = {
+  goods: '/selection',
+  orders: '/purchases',
+  archive: '/archives',
+  mine: '/profile',
+};
+function navigate(nextTab: string) {
+  tab.value = nextTab;
+  history.pushState({}, '', routeByTab[nextTab]);
+  if (nextTab !== 'mine') load();
+}
+function syncRoute() {
+  const route = Object.entries(routeByTab).find(([, path]) => path === location.pathname);
+  if (route) tab.value = route[0];
+  else if (!user.value) authMode.value = location.pathname === '/register' ? 'register' : 'login';
+  else {
+    tab.value = 'goods';
+    history.replaceState({}, '', '/selection');
+  }
+}
+function switchAuth(mode: 'login' | 'register') {
+  authMode.value = mode;
+  history.pushState({}, '', mode === 'login' ? '/login' : '/register');
+}
 const api = async (path: string, options: any = {}) => {
   const r = await fetch('/api' + path, {
     ...options,
@@ -51,6 +84,7 @@ const notify = (s: string) => {
 };
 const logout = () => {
   window.localStorage.clear();
+  history.replaceState({}, '', '/login');
   window.location.reload();
 };
 async function submitAuth() {
@@ -60,6 +94,8 @@ async function submitAuth() {
       body: JSON.stringify(auth.value),
     });
     localStorage.setItem('auth', JSON.stringify(user.value));
+    history.replaceState({}, '', '/selection');
+    tab.value = 'goods';
     await load();
   } catch (e: any) {
     notify(e.message);
@@ -72,50 +108,62 @@ async function load() {
   if (['ADMIN', 'BUYER'].includes(user.value.role)) stores.value = await api('/stores');
 }
 async function buy(p: Product) {
-  const qty = Number(prompt('计划采购数量', '10'));
-  if (!qty) return;
-  await api('/purchase-orders', {
-    method: 'POST',
-    body: JSON.stringify({
-      productId: p.id,
-      planQty: qty,
-      operatorRemark: prompt('运营备注（可选）', ''),
-    }),
-  });
-  notify('已加入今日采购');
-  load();
+  activeProduct.value = p;
+  form.value = { ...form.value, qty: 100, remark: '' };
+  dialog.value = 'buy';
 }
 async function complete(o: any) {
-  const actualQty = Number(prompt('实际采购数量', o.planQty));
-  const actualPrice = Number(prompt('实际采购单价', ''));
-  if (!actualQty || !actualPrice) return;
-  await api(`/purchase-orders/${o.id}/complete`, {
-    method: 'POST',
-    body: JSON.stringify({ actualQty, actualPrice, buyerRemark: prompt('买手备注（可选）', '') }),
-  });
-  load();
+  activeOrder.value = o;
+  form.value = { ...form.value, qty: o.planQty, actualPrice: 0, remark: '' };
+  dialog.value = 'complete';
 }
 async function createStore() {
-  const name = prompt('店铺名称'),
-    location = prompt('档口位置');
-  if (name && location) {
-    await api('/stores', { method: 'POST', body: JSON.stringify({ name, location }) });
-    load();
-  }
+  form.value = { ...form.value, name: '', location: '' };
+  dialog.value = 'store';
 }
 async function createProduct() {
   if (!stores.value.length) return notify('请先创建店铺');
-  const name = prompt('商品名称'),
-    price = Number(prompt('参考价格')),
-    storeId = stores.value[0].id;
-  if (name && price) {
+  form.value = { ...form.value, name: '', price: 0 };
+  dialog.value = 'product';
+}
+async function submitDialog() {
+  if (dialog.value === 'buy' && activeProduct.value) {
+    await api('/purchase-orders', {
+      method: 'POST',
+      body: JSON.stringify({
+        productId: activeProduct.value.id,
+        planQty: form.value.qty,
+        operatorRemark: form.value.remark,
+      }),
+    });
+    notify('已加入今日采购单');
+  } else if (dialog.value === 'complete' && activeOrder.value) {
+    await api(`/purchase-orders/${activeOrder.value.id}/complete`, {
+      method: 'POST',
+      body: JSON.stringify({
+        actualQty: form.value.qty,
+        actualPrice: form.value.actualPrice,
+        buyerRemark: form.value.remark,
+      }),
+    });
+  } else if (dialog.value === 'store') {
+    await api('/stores', {
+      method: 'POST',
+      body: JSON.stringify({ name: form.value.name, location: form.value.location }),
+    });
+  } else if (dialog.value === 'product') {
     await api('/products', {
       method: 'POST',
-      body: JSON.stringify({ name, price, storeId, onSale: true }),
+      body: JSON.stringify({
+        name: form.value.name,
+        price: form.value.price,
+        storeId: stores.value[0].id,
+        onSale: true,
+      }),
     });
-    tab.value = 'archive';
-    load();
   }
+  dialog.value = null;
+  await load();
 }
 async function uploadStorefront(event: Event, store: Store) {
   const file = (event.target as HTMLInputElement).files?.[0];
@@ -277,35 +325,28 @@ const visibleProducts = computed(() =>
     (p.name + ' ' + (p.storeName || '') + ' ' + (p.storeLocation || '')).includes(q.value),
   ),
 );
-onMounted(load);
+const pendingOrders = computed(() => orders.value.filter((order) => order.status !== 'COMPLETED'));
+const completedOrders = computed(() =>
+  orders.value.filter((order) => order.status === 'COMPLETED'),
+);
+const actualAmount = computed(() =>
+  completedOrders.value.reduce(
+    (sum, order) => sum + Number(order.actualQty || 0) * Number(order.actualPrice || 0),
+    0,
+  ),
+);
+onMounted(() => {
+  syncRoute();
+  window.addEventListener('popstate', syncRoute);
+  if (!user.value && !['/login', '/register'].includes(location.pathname)) {
+    history.replaceState({}, '', '/login');
+  }
+  load();
+});
 </script>
 <template>
-  <div v-if="!user" class="auth">
-    <section>
-      <div class="eyebrow">YIWU PROCUREMENT</div>
-      <h1>义采通</h1>
-      <p>让每一次选品、采购与商品沉淀都有迹可循。</p>
-      <div class="switch">
-        <button @click="authMode = 'login'" :class="{ active: authMode === 'login' }">登录</button
-        ><button @click="authMode = 'register'" :class="{ active: authMode === 'register' }">
-          注册
-        </button>
-      </div>
-      <input
-        v-if="authMode === 'register'"
-        v-model="auth.company"
-        placeholder="采购公司或团队名称"
-      /><input v-if="authMode === 'register'" v-model="auth.name" placeholder="姓名" /><input
-        v-model="auth.account"
-        placeholder="登录账号"
-      /><input v-model="auth.password" type="password" placeholder="登录密码（至少 6 位）" /><button
-        class="primary"
-        @click="submitAuth"
-      >
-        {{ authMode === 'login' ? '进入采购后台' : '创建采购后台' }}
-      </button>
-    </section>
-  </div>
+  <AuthPage v-if="!user" :mode="authMode" :form="auth" @switch="switchAuth" @submit="submitAuth" />
+
   <div v-else class="app">
     <header>
       <div>
@@ -313,26 +354,57 @@ onMounted(load);
         <h1>
           {{
             tab === 'goods'
-              ? '选品中心'
+              ? '今天，要找什么好货？'
               : tab === 'orders'
-                ? '今日采购'
+                ? '今天，要跑哪些档口？'
                 : tab === 'archive'
-                  ? '档案管理'
-                  : '我的'
+                  ? '供应商与商品档案'
+                  : '我的采购后台'
           }}
         </h1>
       </div>
-      <div class="avatar">{{ user.name[0] }}</div>
+      <button class="avatar" @click="navigate('mine')">{{ user.name[0] }}</button>
     </header>
+
     <main>
-      <template v-if="tab === 'goods'"
-        ><div class="search">
-          <input v-model="q" @keyup.enter="load" placeholder="搜索商品、店铺或档口位置" /><button
-            @click="load"
-          >
-            搜索</button
-          ><label
-            >以图搜图<input
+      <SelectionPage
+        v-if="tab === 'goods'"
+        :products="visibleProducts"
+        :query="q"
+        :user-role="user.role"
+        :company="user.company"
+        @query-change="q = $event"
+        @search="load"
+        @image-search="chooseImage($event, 'search')"
+        @buy="buy"
+      />
+      <PurchasesPage
+        v-else-if="tab === 'orders'"
+        :orders="orders"
+        :pending-count="pendingOrders.length"
+        :completed-count="completedOrders.length"
+        :actual-amount="actualAmount"
+        :user-role="user.role"
+        @complete="complete"
+      />
+      <ArchivesPage
+        v-else-if="tab === 'archive'"
+        :stores="stores"
+        :products="products"
+        :user-role="user.role"
+        @create-store="createStore"
+        @create-product="createProduct"
+        @storefront="uploadStorefront"
+        @product-image="(event, product) => chooseImage(event, 'upload', product)"
+      />
+      <ProfilePage v-else :user="user" @logout="logout" />
+
+      <template v-if="false">
+        <div class="search">
+          <input v-model="q" @keyup.enter="load" placeholder="搜商品、店铺或档口位置" />
+          <button @click="load">搜索</button>
+          <label class="image-search"
+            >▣ 以图搜图<input
               hidden
               type="file"
               accept="image/*"
@@ -340,166 +412,315 @@ onMounted(load);
           /></label>
         </div>
         <div class="heading">
-          <h2>历史热采</h2>
-          <span>相似检索最多返回 Top 20</span>
+          <div>
+            <div class="eyebrow">{{ user.company }}采购</div>
+            <h2>{{ q ? `找到 ${visibleProducts.length} 个相关商品` : '历史热采' }}</h2>
+          </div>
+          <span>已下架商品不会展示 · 相似检索 Top 20</span>
         </div>
         <div class="grid">
-          <article v-for="p in visibleProducts" :key="p.id">
-            <div class="photo">
-              <img v-if="p.images[0]" :src="p.images[0]" /><span v-else>饰</span>
+          <article v-for="p in visibleProducts" :key="p.id" class="card">
+            <div class="carousel">
+              <img v-if="p.images[0]" class="product-photo" :src="p.images[0]" :alt="p.name" />
+              <div v-else class="art coral">饰</div>
+              <div class="dots"><i class="active"></i><i></i><i></i></div>
+              <span class="counter">{{ p.images.length || 1 }} 张</span>
             </div>
-            <div class="info">
-              <small>{{ p.storeLocation || '档口信息已隐藏' }}</small>
+            <div class="body">
+              <div class="loc">⌖ {{ p.storeLocation || '档口信息已隐藏' }}</div>
               <h3>{{ p.name }}</h3>
-              <p>{{ p.storeName || '供应商信息已隐藏' }} · ¥{{ p.price }}</p>
-              <button v-if="['ADMIN', 'OPERATOR'].includes(user.role)" @click="buy(p)">
-                加入采购
-              </button>
+              <p>{{ p.storeName || '供应商信息已隐藏' }} · 历史采购 {{ p.totalPurchasedQty }} 件</p>
+              <div class="photo-hint">商品图片可左右切换查看</div>
+              <div class="foot">
+                <strong>¥{{ Number(p.price).toFixed(2) }}</strong>
+                <button v-if="['ADMIN', 'OPERATOR'].includes(user.role)" @click="buy(p)">
+                  加入今日采购
+                </button>
+              </div>
             </div>
           </article>
-        </div></template
-      >
-      <template v-if="tab === 'orders'"
-        ><div class="heading">
-          <h2>采购任务</h2>
-          <span>{{ new Date().toLocaleDateString() }}</span>
         </div>
-        <div class="orders">
-          <article v-for="o in orders" :key="o.id">
-            <div>
-              <small>📍 {{ o.storeLocation || '档口信息已隐藏' }}</small>
-              <h3>{{ o.productName }}</h3>
-              <p>{{ o.storeName || '供应商信息已隐藏' }}</p>
-            </div>
-            <strong>计划 {{ o.planQty }} 件</strong>
-            <div>
-              <span :class="o.status">{{ o.status === 'COMPLETED' ? '已完成' : '待采购' }}</span
-              ><button
-                v-if="o.status === 'PENDING' && ['ADMIN', 'BUYER'].includes(user.role)"
-                @click="complete(o)"
-              >
-                完成采购
-              </button>
-              <p v-if="o.actualQty">实采 {{ o.actualQty }} · ¥{{ o.actualPrice }}</p>
-            </div>
-          </article>
-        </div></template
-      >
-      <template v-if="tab === 'archive'"
-        ><div class="heading">
-          <h2>商品与店铺档案</h2>
+      </template>
+
+      <template v-if="false">
+        <div class="date-tabs">
+          <button class="active">今天</button><button>昨天</button><button>前天</button>
+          <input type="date" :value="new Date().toISOString().slice(0, 10)" />
+          <span class="date-caption">正在查看：今天</span>
+        </div>
+        <div class="summary">
           <div>
-            <button v-if="user.role === 'ADMIN'" @click="createStore">新增店铺</button>
-            <button v-if="user.role === 'ADMIN'" @click="createProduct">新增商品</button>
+            <span>待跑档口</span><strong>{{ pendingOrders.length }}</strong>
+          </div>
+          <div>
+            <span>计划件数</span><strong>{{ orders.reduce((s, o) => s + o.planQty, 0) }}</strong>
+          </div>
+          <div>
+            <span>实际采购金额</span><strong>¥{{ actualAmount.toFixed(0) }}</strong>
+          </div>
+          <div>
+            <span>完成进度</span>
+            <strong
+              >{{
+                orders.length ? Math.round((completedOrders.length / orders.length) * 100) : 0
+              }}%</strong
+            >
           </div>
         </div>
-        <div class="stores">
-          <article v-for="s in stores" :key="s.id" class="store-card">
-            <div class="storefront">
-              <img v-if="s.storefrontUrl" :src="s.storefrontUrl" :alt="`${s.name}门头图片`" />
-              <span v-else>暂无门头图</span>
-            </div>
+        <div class="route">↗ 今日待办已按档口位置排好路线 · 当前角色：{{ user.role }}</div>
+        <article
+          v-for="(o, index) in orders"
+          :key="o.id"
+          class="order"
+          :class="{ done: o.status === 'COMPLETED' }"
+        >
+          <div class="order-gallery">
+            <img v-if="o.images?.[0]" :src="o.images[0]" />
+            <div v-else class="thumb sage">饰</div>
+            <small>1 / 1</small>
+          </div>
+          <div class="order-location">
+            <span class="stop">{{
+              o.status === 'COMPLETED' ? '✓ 已完成' : `第 ${index + 1} 站`
+            }}</span>
+            <strong>⌖ {{ o.storeLocation || '档口信息已隐藏' }}</strong>
+            <small>{{ o.storeName || '供应商信息已隐藏' }}　{{ o.productName }}</small>
+          </div>
+          <div class="qty-focus" :class="{ single: o.status !== 'COMPLETED' }">
             <div>
-              <strong>{{ s.name }}</strong>
-              <small>{{ s.location }}</small>
-              <label v-if="user.role === 'ADMIN'"
-                >{{ s.storefrontUrl ? '替换门头图片' : '上传门头图片'
-                }}<input
-                  hidden
-                  type="file"
-                  accept="image/jpeg,image/png,image/webp"
-                  @change="uploadStorefront($event, s)"
-              /></label>
+              <span>计划采购</span><strong>{{ o.planQty }}</strong
+              ><em>件</em>
             </div>
-          </article>
+            <div v-if="o.status === 'COMPLETED'">
+              <span>实际采购</span><strong>{{ o.actualQty }}</strong
+              ><em>件</em>
+            </div>
+          </div>
+          <div v-if="o.status === 'COMPLETED'" class="price-focus">
+            <span>实际采购价</span><strong>¥{{ Number(o.actualPrice).toFixed(2) }}</strong>
+          </div>
+          <div v-else class="record-action">
+            <button
+              v-if="['ADMIN', 'BUYER'].includes(user.role)"
+              class="complete-action"
+              @click="complete(o)"
+            >
+              完成
+            </button>
+          </div>
+        </article>
+      </template>
+
+      <template v-if="false">
+        <div class="heading">
+          <div>
+            <div class="eyebrow">供应商档案</div>
+            <h2>供应商店铺</h2>
+            <span>先建立店铺，再进入店铺维护商品</span>
+          </div>
+          <div class="heading-actions">
+            <button v-if="user.role === 'ADMIN'" class="primary" @click="createStore">
+              ＋ 新建店铺
+            </button>
+            <button v-if="user.role === 'ADMIN'" class="primary" @click="createProduct">
+              ＋ 新建商品
+            </button>
+          </div>
         </div>
-        <div class="grid">
-          <article v-for="p in products" :key="p.id">
-            <div class="photo">
-              <img v-if="p.images[0]" :src="p.images[0]" /><span v-else>图</span>
-            </div>
-            <div class="info">
-              <small>{{ p.storeLocation }}</small>
-              <h3>{{ p.name }}</h3>
-              <p>¥{{ p.price }} · {{ p.onSale ? '上架' : '下架' }}</p>
-              <label v-if="user.role === 'ADMIN'"
-                >上传并框选商品<input
-                  hidden
-                  type="file"
-                  accept="image/*"
-                  @change="chooseImage($event, 'upload', p)"
-              /></label>
-            </div>
-          </article></div
-      ></template>
-      <template v-if="tab === 'mine'"
-        ><section class="profile">
+        <section class="archive-group">
+          <div class="group-head">
+            <h3>⌖ 全部档口</h3>
+            <span>{{ stores.length }} 家店铺</span>
+          </div>
+          <div class="archive-list">
+            <article v-for="s in stores" :key="s.id" class="supplier-record">
+              <div class="storefront">
+                <img v-if="s.storefrontUrl" :src="s.storefrontUrl" :alt="`${s.name}门头`" />
+                <span v-else>店</span>
+              </div>
+              <div class="record-info">
+                <div class="loc">{{ s.location }}</div>
+                <h3>{{ s.name }}</h3>
+                <p>已归档 {{ products.filter((p) => p.storeId === s.id).length }} 款商品</p>
+              </div>
+              <div class="record-action">
+                <label v-if="user.role === 'ADMIN'" class="ghost"
+                  >{{ s.storefrontUrl ? '替换门头' : '上传门头'
+                  }}<input
+                    hidden
+                    type="file"
+                    accept="image/*"
+                    @change="uploadStorefront($event, s)"
+                /></label>
+              </div>
+            </article>
+          </div>
+        </section>
+        <section class="archive-group">
+          <div class="group-head">
+            <h3>商品档案</h3>
+            <span>{{ products.length }} 款商品</span>
+          </div>
+          <div class="archive-list">
+            <article v-for="p in products" :key="p.id" class="archive-record">
+              <div class="storefront product-thumb">
+                <img v-if="p.images[0]" :src="p.images[0]" :alt="p.name" /><span v-else>饰</span>
+              </div>
+              <div class="record-info">
+                <div class="loc">{{ p.storeLocation }}</div>
+                <h3>{{ p.name }}</h3>
+                <div class="record-meta">
+                  <span
+                    >价格<strong>¥{{ p.price }}</strong></span
+                  >
+                  <span
+                    >状态<strong>{{ p.onSale ? '上架' : '下架' }}</strong></span
+                  >
+                  <span
+                    >图片<strong>{{ p.images.length }} 张</strong></span
+                  >
+                </div>
+              </div>
+              <div class="record-action">
+                <label v-if="user.role === 'ADMIN'" class="ghost"
+                  >上传并框选商品<input
+                    hidden
+                    type="file"
+                    accept="image/*"
+                    @change="chooseImage($event, 'upload', p)"
+                /></label>
+              </div>
+            </article>
+          </div>
+        </section>
+      </template>
+
+      <template v-if="false">
+        <section class="profile">
           <div class="avatar">{{ user.name[0] }}</div>
           <div>
-            <div class="eyebrow">{{ user.role }}</div>
+            <div class="eyebrow">{{ user.role }} · 当前账号</div>
             <h2>{{ user.name }}</h2>
-            <p>{{ user.company }} · {{ auth.account }}</p>
+            <small>{{ user.company }}采购团队 · 今天在线</small>
           </div>
-          <button @click="logout">退出登录</button>
+          <button class="logout-button" @click="logout">退出登录</button>
         </section>
-        <div class="permission">
-          <h3>当前权限</h3>
-          <p>管理员维护档案和团队；运营选品下单；买手执行采购；查看者只读浏览。</p>
-        </div></template
-      >
+        <section class="setting-form">
+          <div class="eyebrow">采购主体设置</div>
+          <h3>采购公司或团队名称</h3>
+          <label>当前名称<input :value="user.company" disabled /></label>
+          <p class="permission-hint">当前登录角色：{{ user.role }}</p>
+        </section>
+        <div class="archive permission-grid">
+          <article>
+            <h3>管理员</h3>
+            <p>全部权限：档案、订单、团队和采购设置</p>
+          </article>
+          <article>
+            <h3>运营</h3>
+            <p>选品下单；维护未完成采购任务</p>
+          </article>
+          <article>
+            <h3>买手</h3>
+            <p>现场完成采购，填写实采数量和单价</p>
+          </article>
+          <article>
+            <h3>查看者</h3>
+            <p>只读查看商品、订单及历史记录</p>
+          </article>
+        </div>
+      </template>
     </main>
+
     <nav>
+      <button :class="{ active: tab === 'goods' }" @click="navigate('goods')">
+        <b>⌕</b>选品中心
+      </button>
+      <button :class="{ active: tab === 'orders' }" @click="navigate('orders')">
+        <b>✓</b>今日采购
+      </button>
       <button
-        @click="
-          tab = 'goods';
-          load();
-        "
-        :class="{ active: tab === 'goods' }"
-      >
-        选品中心</button
-      ><button
-        @click="
-          tab = 'orders';
-          load();
-        "
-        :class="{ active: tab === 'orders' }"
-      >
-        今日采购</button
-      ><button
         v-if="['ADMIN', 'BUYER'].includes(user.role)"
-        @click="
-          tab = 'archive';
-          load();
-        "
         :class="{ active: tab === 'archive' }"
+        @click="navigate('archive')"
       >
-        档案管理</button
-      ><button @click="tab = 'mine'" :class="{ active: tab === 'mine' }">我的</button>
+        <b>▤</b>档案管理
+      </button>
+      <button :class="{ active: tab === 'mine' }" @click="navigate('mine')"><b>●</b>我的</button>
     </nav>
   </div>
-  <div v-if="cropOpen" class="modal">
-    <section>
+
+  <div v-if="dialog" class="modal show" @click.self="dialog = null">
+    <section class="sheet">
+      <div class="eyebrow">
+        {{ dialog === 'store' ? '供应商店铺' : dialog === 'product' ? '商品档案' : '采购记录' }}
+      </div>
+      <h2>
+        {{
+          dialog === 'buy'
+            ? '加入今日采购'
+            : dialog === 'complete'
+              ? '确认实际采购'
+              : dialog === 'store'
+                ? '新建店铺'
+                : '新建商品'
+        }}
+      </h2>
+      <strong v-if="activeProduct"
+        >{{ activeProduct.name }} · {{ activeProduct.storeLocation }}</strong
+      >
+      <label v-if="dialog === 'store' || dialog === 'product'"
+        ><p>{{ dialog === 'store' ? '店铺名称' : '商品名称' }}</p>
+        <input v-model="form.name"
+      /></label>
+      <label v-if="dialog === 'store'"
+        ><p>档口位置</p>
+        <input v-model="form.location" placeholder="例如：1区 3楼 12街 18390"
+      /></label>
+      <label v-if="dialog === 'product'"
+        ><p>商品价格</p>
+        <input v-model.number="form.price" type="number" step=".1"
+      /></label>
+      <label v-if="dialog === 'buy' || dialog === 'complete'"
+        ><p>{{ dialog === 'buy' ? '采购数量' : '实际采购数量' }}</p>
+        <input v-model.number="form.qty" type="number" min="1"
+      /></label>
+      <label v-if="dialog === 'complete'"
+        ><p>实际采购单价</p>
+        <input v-model.number="form.actualPrice" type="number" step=".1"
+      /></label>
+      <label v-if="dialog === 'buy' || dialog === 'complete'"
+        ><p>备注（选填）</p>
+        <textarea v-model="form.remark" rows="3" />
+      </label>
+      <button class="primary" @click="submitDialog">确认</button>
+    </section>
+  </div>
+
+  <div v-if="cropOpen" class="modal show" @click.self="cropOpen = false">
+    <section class="sheet crop-sheet">
+      <div class="eyebrow">SIGLIP2 IMAGE SEARCH</div>
       <h2>{{ cropMode === 'upload' ? '框选多个商品区域' : '框选要搜索的商品' }}</h2>
       <p>
         {{
           cropMode === 'upload'
-            ? '每次拖拽添加一个框，最多 20 个；后端将按原图像素坐标分别裁剪并建模。'
-            : '按住鼠标拖拽矩形，只使用框选区域进行相似图片检索。'
+            ? '每次拖拽添加一个框，最多 20 个；裁剪小图仅向量化，不保存。'
+            : '拖拽矩形，只使用框选区域进行相似图片检索。'
         }}
       </p>
       <canvas ref="canvas" @mousedown="down" @mousemove="move" @mouseup="finishBox"></canvas>
-      <div v-if="cropMode === 'upload' && boxes.length">
+      <div class="region-list" v-if="cropMode === 'upload'">
         <button v-for="(_, index) in boxes" :key="index" @click="removeBox(index)">
           删除区域 {{ index + 1 }}
         </button>
       </div>
-      <div>
-        <button @click="cropOpen = false">取消</button
-        ><button class="primary" @click="cropSubmit">
+      <div class="sheet-actions">
+        <button class="ghost" @click="cropOpen = false">取消</button>
+        <button class="primary" @click="cropSubmit">
           {{ cropMode === 'upload' ? `确认 ${boxes.length} 个区域` : '确认框选' }}
         </button>
       </div>
     </section>
   </div>
-  <div v-if="message" class="toast">{{ message }}</div>
+  <div v-if="message" class="toast show">{{ message }}</div>
 </template>

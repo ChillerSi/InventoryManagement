@@ -23,6 +23,18 @@ powershell -ExecutionPolicy Bypass -File .\scripts\windows\stop-local.ps1
 1.18.2、Temurin JDK 21.0.11+10，以及
 `google/siglip2-base-patch16-224@75de2d55ec2d0b4efc50b3e9ad70dba96a7b2fa2`。
 
+## 前端页面结构与地址
+
+前端页面按业务模块存放在 `frontend/src/pages`：
+
+- `auth/AuthPage.vue`：登录 `/login`、注册 `/register`
+- `selection/SelectionPage.vue`：选品中心 `/selection`
+- `purchases/PurchasesPage.vue`：今日采购 `/purchases`
+- `archives/ArchivesPage.vue`：档案管理 `/archives`
+- `profile/ProfilePage.vue`：我的 `/profile`
+
+页面切换使用浏览器 History API，支持前进、后退和直接刷新当前业务地址。
+
 基于原型实现的可运行 MVP：
 
 - `frontend`：Vue 3 + TypeScript + Vite，包含注册/登录、选品中心、今日采购、档案管理、我的。
