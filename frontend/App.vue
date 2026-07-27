@@ -355,7 +355,13 @@ async function submitDialog() {
         }),
       },
     );
-    for (const file of productFiles.value) await uploadWholeProductImage(file, product);
+    const files = [...productFiles.value];
+    if (files.length) {
+      dialog.value = null;
+      await load();
+      beginRegionUploads(files, product);
+      return;
+    }
   } else if (dialog.value === 'member') {
     await api(activeMember.value ? `/users/${activeMember.value.id}` : '/users', {
       method: activeMember.value ? 'PATCH' : 'POST',
@@ -377,21 +383,6 @@ async function uploadStorefrontFile(file: File, store: Store) {
   data.append('file', file);
   return api(`/images/stores/${store.id}/storefront`, { method: 'POST', body: data });
 }
-async function uploadWholeProductImage(file: File, product: Product) {
-  const dimensions = await new Promise<{ width: number; height: number }>((resolve, reject) => {
-    const image = new Image();
-    image.onload = () => resolve({ width: image.naturalWidth, height: image.naturalHeight });
-    image.onerror = reject;
-    image.src = URL.createObjectURL(file);
-  });
-  const data = new FormData();
-  data.append('file', file);
-  data.append(
-    'regions',
-    JSON.stringify([{ x: 0, y: 0, width: dimensions.width, height: dimensions.height }]),
-  );
-  await api(`/images/products/${product.id}/regions`, { method: 'POST', body: data });
-}
 async function uploadStorefront(event: Event, store: Store) {
   const file = (event.target as HTMLInputElement).files?.[0];
   if (!file) return;
@@ -410,11 +401,11 @@ async function uploadStorefront(event: Event, store: Store) {
     (event.target as HTMLInputElement).value = '';
   }
 }
-async function uploadProductImages(event: Event, product: Product) {
-  const files = Array.from((event.target as HTMLInputElement).files || []);
-  for (const file of files) await uploadWholeProductImage(file, product);
-  await load();
-  notify(`已添加 ${files.length} 张商品图片`);
+function uploadProductImages(event: Event, product: Product) {
+  const input = event.target as HTMLInputElement;
+  const files = Array.from(input.files || []);
+  input.value = '';
+  if (files.length) beginRegionUploads(files, product);
 }
 const cropOpen = ref(false),
   cropSrc = ref(''),
@@ -425,19 +416,39 @@ const cropOpen = ref(false),
   start = ref({ x: 0, y: 0 }),
   box = ref<SelectionBox>({ x: 20, y: 20, w: 180, h: 180 }),
   boxes = ref<SelectionBox[]>([]),
+  uploadQueue = ref<File[]>([]),
+  uploadTotal = ref(0),
   imageRect = ref({ x: 0, y: 0, w: 0, h: 0, naturalW: 0, naturalH: 0 });
-function chooseImage(e: Event, mode: 'search' | 'upload', p?: Product) {
-  const f = (e.target as HTMLInputElement).files?.[0];
-  if (!f) return;
-  cropFile.value = f;
+function openCropFile(file: File, mode: 'search' | 'upload', product?: Product) {
+  cropFile.value = file;
   cropMode.value = mode;
-  cropProduct.value = p;
+  cropProduct.value = product;
   boxes.value = [];
   box.value = { x: 20, y: 20, w: 180, h: 180 };
-  cropSrc.value = URL.createObjectURL(f);
+  if (cropSrc.value) URL.revokeObjectURL(cropSrc.value);
+  cropSrc.value = URL.createObjectURL(file);
   if (mode === 'search') searchPreview.value = cropSrc.value;
   cropOpen.value = true;
   nextTick(draw);
+}
+function beginRegionUploads(files: File[], product: Product) {
+  uploadQueue.value = [...files];
+  uploadTotal.value = files.length;
+  openCropFile(uploadQueue.value[0], 'upload', product);
+}
+function chooseImage(e: Event, mode: 'search' | 'upload', p?: Product) {
+  const input = e.target as HTMLInputElement;
+  const files = Array.from(input.files || []);
+  const f = files[0];
+  input.value = '';
+  if (!f) return;
+  if (mode === 'upload' && p) beginRegionUploads(files, p);
+  else openCropFile(f, mode, p);
+}
+function cancelCrop() {
+  uploadQueue.value = [];
+  uploadTotal.value = 0;
+  cropOpen.value = false;
 }
 function draw() {
   const c = canvas.value!,
@@ -526,9 +537,17 @@ async function cropSubmit() {
         method: 'POST',
         body: fd,
       });
-      await load();
-      cropOpen.value = false;
-      notify(`已完成 ${regions.length} 个区域的向量化`);
+      uploadQueue.value.shift();
+      if (uploadQueue.value.length) {
+        openCropFile(uploadQueue.value[0], 'upload', cropProduct.value);
+        notify(`当前图片已完成 ${regions.length} 个区域建模，请继续框选下一张图片`);
+      } else {
+        const total = uploadTotal.value;
+        uploadTotal.value = 0;
+        cropOpen.value = false;
+        await load();
+        notify(`已完成 ${total} 张图片的框选与向量化`);
+      }
     } catch (error: any) {
       notify(error.message);
     }
@@ -1015,7 +1034,7 @@ onBeforeUnmount(() => {
         <input v-model.number="form.price" type="number" step=".1"
       /></label>
       <label v-if="dialog === 'product'"
-        ><p>商品图片（可多选）</p>
+        ><p>商品图片（可多选，保存后逐张框选商品）</p>
         <input
           type="file"
           multiple
@@ -1081,10 +1100,16 @@ onBeforeUnmount(() => {
     </section>
   </div>
 
-  <div v-if="cropOpen" class="modal show" @click.self="cropOpen = false">
+  <div v-if="cropOpen" class="modal show" @click.self="cancelCrop">
     <section class="sheet crop-sheet">
       <div class="eyebrow">SIGLIP2 IMAGE SEARCH</div>
-      <h2>{{ cropMode === 'upload' ? '框选多个商品区域' : '框选要搜索的商品' }}</h2>
+      <h2>
+        {{
+          cropMode === 'upload'
+            ? `框选多个商品区域（第 ${uploadTotal - uploadQueue.length + 1}/${uploadTotal} 张）`
+            : '框选要搜索的商品'
+        }}
+      </h2>
       <p>
         {{
           cropMode === 'upload'
@@ -1099,7 +1124,7 @@ onBeforeUnmount(() => {
         </button>
       </div>
       <div class="sheet-actions">
-        <button class="ghost" @click="cropOpen = false">取消</button>
+        <button class="ghost" @click="cancelCrop">取消</button>
         <button class="primary" @click="cropSubmit">
           {{ cropMode === 'upload' ? `确认 ${boxes.length} 个区域` : '确认框选' }}
         </button>

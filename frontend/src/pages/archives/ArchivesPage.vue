@@ -125,7 +125,7 @@ const selectedStore = ref<any>();
           >
             删除</button
           ><label v-if="userRole === 'ADMIN'" class="ghost"
-            >添加图片<input
+            >添加图片并框选<input
               hidden
               type="file"
               multiple
