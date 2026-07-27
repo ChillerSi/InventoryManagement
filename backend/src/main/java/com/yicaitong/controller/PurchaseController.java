@@ -4,10 +4,14 @@ import com.yicaitong.domain.Domain;
 import com.yicaitong.domain.Domain.Product;
 import com.yicaitong.domain.Domain.PurchaseOrder;
 import com.yicaitong.domain.Domain.Store;
+import com.yicaitong.repository.ProductImageRepository;
 import com.yicaitong.repository.ProductRepository;
 import com.yicaitong.repository.PurchaseOrderRepository;
 import com.yicaitong.repository.StoreRepository;
+import com.yicaitong.repository.UserRepository;
 import com.yicaitong.security.UserContext;
+import com.yicaitong.service.MediaService;
+import jakarta.transaction.Transactional;
 import java.math.BigDecimal;
 import java.time.*;
 import java.util.*;
@@ -17,6 +21,8 @@ import org.springframework.web.bind.annotation.*;
 record OrderInput(UUID productId, int planQty, String operatorRemark) {}
 
 record CompleteInput(int actualQty, BigDecimal actualPrice, String buyerRemark) {}
+
+record OrderUpdate(Integer planQty, String operatorRemark, String buyerRemark) {}
 
 record OrderDto(
     UUID id,
@@ -29,6 +35,9 @@ record OrderDto(
     BigDecimal actualPrice,
     String operatorRemark,
     String buyerRemark,
+    String creatorName,
+    String buyerName,
+    List<String> images,
     Domain.OrderStatus status,
     LocalDateTime createdAt,
     LocalDateTime completedAt) {}
@@ -41,17 +50,30 @@ public class PurchaseController {
   private final PurchaseOrderRepository orders;
   private final ProductRepository products;
   private final StoreRepository stores;
+  private final UserRepository users;
+  private final ProductImageRepository images;
+  private final MediaService media;
 
   /** 合并指定日期创建及指定日期完成的采购单，用订单 ID 去重后返回。 */
   @GetMapping
   List<OrderDto> list(@RequestParam(required = false) LocalDate date) {
     LocalDate d = date == null ? LocalDate.now() : date;
     LocalDateTime s = d.atStartOfDay(), e = d.plusDays(1).atStartOfDay();
-    return orders
-        .findByTenantIdAndCreatedAtBetweenOrTenantIdAndCompletedAtBetweenOrderByCreatedAtDesc(
-            UserContext.get().tenantId(), s, e, UserContext.get().tenantId(), s, e)
+    List<PurchaseOrder> selected =
+        new ArrayList<>(
+            orders
+                .findByTenantIdAndCreatedAtBetweenOrTenantIdAndCompletedAtBetweenOrderByCreatedAtDesc(
+                    UserContext.get().tenantId(), s, e, UserContext.get().tenantId(), s, e));
+    if (d.equals(LocalDate.now())) {
+      selected.addAll(
+          orders.findByTenantIdAndStatusAndCreatedAtBeforeOrderByCreatedAtDesc(
+              UserContext.get().tenantId(), Domain.OrderStatus.PENDING, s));
+    }
+    return selected.stream()
+        .collect(java.util.stream.Collectors.toMap(PurchaseOrder::getId, o -> o, (a, b) -> a))
+        .values()
         .stream()
-        .distinct()
+        .sorted(Comparator.comparing(PurchaseOrder::getCreatedAt).reversed())
         .map(this::dto)
         .toList();
   }
@@ -84,18 +106,27 @@ public class PurchaseController {
 
   /** 修改未完成采购单的计划数量和运营备注。 */
   @PatchMapping("/{id}")
-  OrderDto edit(@PathVariable UUID id, @RequestBody OrderInput in) {
-    UserContext.require(Domain.Role.ADMIN, Domain.Role.OPERATOR);
+  OrderDto edit(@PathVariable UUID id, @RequestBody OrderUpdate in) {
     PurchaseOrder o = owned(id);
     if (o.getStatus() != Domain.OrderStatus.PENDING) throw new IllegalStateException("订单已完成");
-    if (in.planQty() > 0) o.setPlanQty(in.planQty());
-    if (in.operatorRemark() != null) o.setOperatorRemark(in.operatorRemark());
+    Domain.Role role = UserContext.get().role();
+    if (role == Domain.Role.ADMIN || role == Domain.Role.OPERATOR) {
+      if (in.planQty() != null && in.planQty() > 0) o.setPlanQty(in.planQty());
+      if (in.operatorRemark() != null) o.setOperatorRemark(in.operatorRemark());
+    }
+    if (role == Domain.Role.ADMIN || role == Domain.Role.BUYER) {
+      if (in.buyerRemark() != null) o.setBuyerRemark(in.buyerRemark());
+    }
+    if (role == Domain.Role.VIEWER) {
+      throw new IllegalStateException("查看者不能修改采购单");
+    }
     orders.save(o);
     return dto(o);
   }
 
   /** 由管理员或买手填写实采数量、实采价格并完成采购。 */
   @PostMapping("/{id}/complete")
+  @Transactional
   OrderDto complete(@PathVariable UUID id, @RequestBody CompleteInput in) {
     UserContext.require(Domain.Role.ADMIN, Domain.Role.BUYER);
     PurchaseOrder o = owned(id);
@@ -106,6 +137,13 @@ public class PurchaseController {
     o.setCompletedAt(LocalDateTime.now());
     o.setStatus(Domain.OrderStatus.COMPLETED);
     orders.save(o);
+    products
+        .findByIdAndTenantIdAndDeletedFalse(o.getProductId(), UserContext.get().tenantId())
+        .ifPresent(
+            product -> {
+              product.setTotalPurchasedQty(product.getTotalPurchasedQty() + in.actualQty());
+              products.save(product);
+            });
     return dto(o);
   }
 
@@ -136,6 +174,13 @@ public class PurchaseController {
         o.getActualPrice(),
         o.getOperatorRemark(),
         o.getBuyerRemark(),
+        users.findById(o.getCreatorUserId()).map(Domain.User::getName).orElse("未知运营"),
+        o.getBuyerUserId() == null
+            ? null
+            : users.findById(o.getBuyerUserId()).map(Domain.User::getName).orElse("未知买手"),
+        images.findByProductIdOrderBySortOrder(o.getProductId()).stream()
+            .map(image -> media.url(image.getObjectKey()))
+            .toList(),
         o.getStatus(),
         o.getCreatedAt(),
         o.getCompletedAt());

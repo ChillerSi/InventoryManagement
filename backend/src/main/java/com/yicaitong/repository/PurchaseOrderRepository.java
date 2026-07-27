@@ -19,4 +19,7 @@ public interface PurchaseOrderRepository extends JpaRepository<PurchaseOrder, UU
           LocalDateTime secondEnd);
 
   Optional<PurchaseOrder> findByIdAndTenantId(UUID id, UUID tenantId);
+
+  List<PurchaseOrder> findByTenantIdAndStatusAndCreatedAtBeforeOrderByCreatedAtDesc(
+      UUID tenantId, com.yicaitong.domain.Domain.OrderStatus status, LocalDateTime end);
 }

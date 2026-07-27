@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, nextTick, onMounted, ref } from 'vue';
+import { computed, nextTick, onBeforeUnmount, onMounted, ref } from 'vue';
 import ArchivesPage from './src/pages/archives/ArchivesPage.vue';
 import AuthPage from './src/pages/auth/AuthPage.vue';
 import ProfilePage from './src/pages/profile/ProfilePage.vue';
@@ -33,16 +33,40 @@ type SelectionBox = { x: number; y: number; w: number; h: number };
 const user = ref<User>(JSON.parse(localStorage.getItem('auth') || 'null') as User),
   tab = ref('goods'),
   products = ref<Product[]>([]),
+  archiveProducts = ref<Product[]>([]),
   orders = ref<any[]>([]),
   stores = ref<Store[]>([]),
+  members = ref<any[]>([]),
   q = ref(''),
+  appliedQ = ref(''),
+  searchPreview = ref(''),
+  previewOpen = ref(false),
+  selectedDate = ref(new Date().toISOString().slice(0, 10)),
   message = ref('');
 const authMode = ref<'login' | 'register'>('login'),
-  auth = ref({ company: '', name: '', account: '', password: '' });
-const dialog = ref<'buy' | 'complete' | 'store' | 'product' | null>(null),
+  auth = ref({ company: '', name: '', account: '', password: '', confirmPassword: '' });
+const dialog = ref<'buy' | 'complete' | 'editOrder' | 'store' | 'product' | 'member' | null>(null),
   activeProduct = ref<Product>(),
   activeOrder = ref<any>(),
-  form = ref({ name: '', location: '', price: 0, qty: 100, actualPrice: 0, remark: '' });
+  activeStore = ref<Store>(),
+  activeMember = ref<any>(),
+  productFiles = ref<File[]>([]),
+  storefrontFile = ref<File>(),
+  form = ref({
+    name: '',
+    account: '',
+    password: '',
+    role: 'OPERATOR',
+    active: true,
+    location: '',
+    price: 0,
+    onSale: true,
+    qty: 100,
+    actualPrice: 0,
+    remark: '',
+    operatorRemark: '',
+    buyerRemark: '',
+  });
 const routeByTab: Record<string, string> = {
   goods: '/selection',
   orders: '/purchases',
@@ -89,6 +113,9 @@ const logout = () => {
 };
 async function submitAuth() {
   try {
+    if (authMode.value === 'register' && auth.value.password !== auth.value.confirmPassword) {
+      return notify('登录密码和确认密码不一致');
+    }
     user.value = await api('/auth/' + authMode.value, {
       method: 'POST',
       body: JSON.stringify(auth.value),
@@ -103,28 +130,143 @@ async function submitAuth() {
 }
 async function load() {
   if (!user.value) return;
+  await Promise.all([loadProducts(), loadOrders()]);
+  if (['ADMIN', 'BUYER'].includes(user.value.role)) {
+    stores.value = await api('/stores');
+    archiveProducts.value = await api('/products?archive=true');
+  }
+  if (user.value.role === 'ADMIN') members.value = await api('/users');
+}
+async function loadProducts() {
   products.value = await api('/products?q=' + encodeURIComponent(q.value));
-  orders.value = await api('/purchase-orders');
-  if (['ADMIN', 'BUYER'].includes(user.value.role)) stores.value = await api('/stores');
+  appliedQ.value = q.value;
+}
+async function loadOrders() {
+  orders.value = await api('/purchase-orders?date=' + selectedDate.value);
+}
+async function selectDate(date: string) {
+  selectedDate.value = date;
+  await loadOrders();
 }
 async function buy(p: Product) {
   activeProduct.value = p;
-  form.value = { ...form.value, qty: 100, remark: '' };
+  form.value = { ...form.value, qty: 100, operatorRemark: '', buyerRemark: '' };
   dialog.value = 'buy';
 }
 async function complete(o: any) {
   activeOrder.value = o;
-  form.value = { ...form.value, qty: o.planQty, actualPrice: 0, remark: '' };
+  form.value = {
+    ...form.value,
+    qty: o.planQty,
+    actualPrice: 0,
+    operatorRemark: o.operatorRemark || '',
+    buyerRemark: o.buyerRemark || '',
+  };
   dialog.value = 'complete';
 }
 async function createStore() {
+  activeStore.value = undefined;
+  storefrontFile.value = undefined;
   form.value = { ...form.value, name: '', location: '' };
   dialog.value = 'store';
 }
-async function createProduct() {
+function editStore(store: Store) {
+  activeStore.value = store;
+  storefrontFile.value = undefined;
+  form.value = { ...form.value, name: store.name, location: store.location };
+  dialog.value = 'store';
+}
+async function deleteStore(store: Store) {
+  if (!confirm(`确认删除店铺“${store.name}”吗？其商品也会软删除，历史采购记录保留。`)) return;
+  await api(`/stores/${store.id}`, { method: 'DELETE' });
+  notify('店铺已软删除');
+  await load();
+}
+async function createProduct(store?: Store) {
   if (!stores.value.length) return notify('请先创建店铺');
-  form.value = { ...form.value, name: '', price: 0 };
+  activeStore.value = store || stores.value[0];
+  activeProduct.value = undefined;
+  productFiles.value = [];
+  form.value = { ...form.value, name: '', price: 0, onSale: true };
   dialog.value = 'product';
+}
+function editProduct(product: Product) {
+  activeProduct.value = product;
+  activeStore.value = stores.value.find((store) => store.id === product.storeId);
+  productFiles.value = [];
+  form.value = {
+    ...form.value,
+    name: product.name,
+    price: product.price,
+    onSale: product.onSale,
+  };
+  dialog.value = 'product';
+}
+async function toggleProduct(product: Product) {
+  await api(`/products/${product.id}`, {
+    method: 'PATCH',
+    body: JSON.stringify({ onSale: !product.onSale }),
+  });
+  await load();
+}
+async function deleteProduct(product: Product) {
+  if (!confirm(`确认删除商品“${product.name}”吗？数据库仅做软删除。`)) return;
+  await api(`/products/${product.id}`, { method: 'DELETE' });
+  notify('商品已软删除');
+  await load();
+}
+function editOrder(order: any) {
+  activeOrder.value = order;
+  form.value = {
+    ...form.value,
+    qty: order.planQty,
+    operatorRemark: order.operatorRemark || '',
+    buyerRemark: order.buyerRemark || '',
+  };
+  dialog.value = 'editOrder';
+}
+async function deleteOrder(order: any) {
+  if (!confirm(`确认删除“${order.productName}”采购任务吗？`)) return;
+  await api(`/purchase-orders/${order.id}`, { method: 'DELETE' });
+  await loadOrders();
+}
+function createMember() {
+  activeMember.value = undefined;
+  form.value = {
+    ...form.value,
+    name: '',
+    account: '',
+    password: '',
+    role: 'OPERATOR',
+    active: true,
+  };
+  dialog.value = 'member';
+}
+function editMember(member: any) {
+  activeMember.value = member;
+  form.value = {
+    ...form.value,
+    name: member.name,
+    account: member.account,
+    password: '',
+    role: member.role,
+    active: member.active,
+  };
+  dialog.value = 'member';
+}
+async function deleteMember(member: any) {
+  if (!confirm(`确认删除子账号“${member.name}”吗？`)) return;
+  await api(`/users/${member.id}`, { method: 'DELETE' });
+  members.value = await api('/users');
+}
+async function saveCompany(name: string) {
+  const result = await api('/users/company', {
+    method: 'PATCH',
+    body: JSON.stringify({ name }),
+  });
+  user.value.company = result.name;
+  localStorage.setItem('auth', JSON.stringify(user.value));
+  notify('采购主体名称已保存');
 }
 async function submitDialog() {
   if (dialog.value === 'buy' && activeProduct.value) {
@@ -133,7 +275,7 @@ async function submitDialog() {
       body: JSON.stringify({
         productId: activeProduct.value.id,
         planQty: form.value.qty,
-        operatorRemark: form.value.remark,
+        operatorRemark: form.value.operatorRemark,
       }),
     });
     notify('已加入今日采购单');
@@ -143,27 +285,72 @@ async function submitDialog() {
       body: JSON.stringify({
         actualQty: form.value.qty,
         actualPrice: form.value.actualPrice,
-        buyerRemark: form.value.remark,
+        buyerRemark: form.value.buyerRemark,
+      }),
+    });
+  } else if (dialog.value === 'editOrder' && activeOrder.value) {
+    await api(`/purchase-orders/${activeOrder.value.id}`, {
+      method: 'PATCH',
+      body: JSON.stringify({
+        planQty: form.value.qty,
+        operatorRemark: form.value.operatorRemark,
+        buyerRemark: form.value.buyerRemark,
       }),
     });
   } else if (dialog.value === 'store') {
-    await api('/stores', {
-      method: 'POST',
+    const store = await api(activeStore.value ? `/stores/${activeStore.value.id}` : '/stores', {
+      method: activeStore.value ? 'PATCH' : 'POST',
       body: JSON.stringify({ name: form.value.name, location: form.value.location }),
     });
+    if (storefrontFile.value) await uploadStorefrontFile(storefrontFile.value, store);
   } else if (dialog.value === 'product') {
-    await api('/products', {
-      method: 'POST',
+    const product = await api(
+      activeProduct.value ? `/products/${activeProduct.value.id}` : '/products',
+      {
+        method: activeProduct.value ? 'PATCH' : 'POST',
+        body: JSON.stringify({
+          name: form.value.name,
+          price: form.value.price,
+          storeId: activeStore.value?.id,
+          onSale: form.value.onSale,
+        }),
+      },
+    );
+    for (const file of productFiles.value) await uploadWholeProductImage(file, product);
+  } else if (dialog.value === 'member') {
+    await api(activeMember.value ? `/users/${activeMember.value.id}` : '/users', {
+      method: activeMember.value ? 'PATCH' : 'POST',
       body: JSON.stringify({
         name: form.value.name,
-        price: form.value.price,
-        storeId: stores.value[0].id,
-        onSale: true,
+        account: form.value.account,
+        password: form.value.password,
+        role: form.value.role,
+        active: form.value.active,
       }),
     });
   }
   dialog.value = null;
   await load();
+}
+async function uploadStorefrontFile(file: File, store: Store) {
+  const data = new FormData();
+  data.append('file', file);
+  return api(`/images/stores/${store.id}/storefront`, { method: 'POST', body: data });
+}
+async function uploadWholeProductImage(file: File, product: Product) {
+  const dimensions = await new Promise<{ width: number; height: number }>((resolve, reject) => {
+    const image = new Image();
+    image.onload = () => resolve({ width: image.naturalWidth, height: image.naturalHeight });
+    image.onerror = reject;
+    image.src = URL.createObjectURL(file);
+  });
+  const data = new FormData();
+  data.append('file', file);
+  data.append(
+    'regions',
+    JSON.stringify([{ x: 0, y: 0, width: dimensions.width, height: dimensions.height }]),
+  );
+  await api(`/images/products/${product.id}/regions`, { method: 'POST', body: data });
 }
 async function uploadStorefront(event: Event, store: Store) {
   const file = (event.target as HTMLInputElement).files?.[0];
@@ -182,6 +369,12 @@ async function uploadStorefront(event: Event, store: Store) {
   } finally {
     (event.target as HTMLInputElement).value = '';
   }
+}
+async function uploadProductImages(event: Event, product: Product) {
+  const files = Array.from((event.target as HTMLInputElement).files || []);
+  for (const file of files) await uploadWholeProductImage(file, product);
+  await load();
+  notify(`已添加 ${files.length} 张商品图片`);
 }
 const cropOpen = ref(false),
   cropSrc = ref(''),
@@ -202,6 +395,7 @@ function chooseImage(e: Event, mode: 'search' | 'upload', p?: Product) {
   boxes.value = [];
   box.value = { x: 20, y: 20, w: 180, h: 180 };
   cropSrc.value = URL.createObjectURL(f);
+  if (mode === 'search') searchPreview.value = cropSrc.value;
   cropOpen.value = true;
   nextTick(draw);
 }
@@ -232,14 +426,24 @@ function draw() {
   };
   img.src = cropSrc.value;
 }
+function canvasPoint(e: MouseEvent) {
+  const target = canvas.value!,
+    rect = target.getBoundingClientRect();
+  return {
+    x: ((e.clientX - rect.left) / rect.width) * target.width,
+    y: ((e.clientY - rect.top) / rect.height) * target.height,
+  };
+}
 function down(e: MouseEvent) {
-  start.value = { x: e.offsetX, y: e.offsetY };
-  box.value = { x: e.offsetX, y: e.offsetY, w: 0, h: 0 };
+  const point = canvasPoint(e);
+  start.value = point;
+  box.value = { x: point.x, y: point.y, w: 0, h: 0 };
 }
 function move(e: MouseEvent) {
   if (!(e.buttons & 1)) return;
-  box.value.w = e.offsetX - start.value.x;
-  box.value.h = e.offsetY - start.value.y;
+  const point = canvasPoint(e);
+  box.value.w = point.x - start.value.x;
+  box.value.h = point.y - start.value.y;
   draw();
 }
 function finishBox() {
@@ -320,11 +524,7 @@ async function cropSubmit() {
     0.9,
   );
 }
-const visibleProducts = computed(() =>
-  products.value.filter((p) =>
-    (p.name + ' ' + (p.storeName || '') + ' ' + (p.storeLocation || '')).includes(q.value),
-  ),
-);
+const visibleProducts = computed(() => products.value);
 const pendingOrders = computed(() => orders.value.filter((order) => order.status !== 'COMPLETED'));
 const completedOrders = computed(() =>
   orders.value.filter((order) => order.status === 'COMPLETED'),
@@ -335,6 +535,21 @@ const actualAmount = computed(() =>
     0,
   ),
 );
+const actualQty = computed(() =>
+  completedOrders.value.reduce((sum, order) => sum + Number(order.actualQty || 0), 0),
+);
+const dateCaption = computed(() => {
+  const offset = (days: number) => {
+    const date = new Date();
+    date.setDate(date.getDate() - days);
+    return date.toISOString().slice(0, 10);
+  };
+  if (selectedDate.value === offset(0)) return '今天';
+  if (selectedDate.value === offset(1)) return '昨天';
+  if (selectedDate.value === offset(2)) return '前天';
+  return selectedDate.value;
+});
+let refreshTimer: number | undefined;
 onMounted(() => {
   syncRoute();
   window.addEventListener('popstate', syncRoute);
@@ -342,6 +557,13 @@ onMounted(() => {
     history.replaceState({}, '', '/login');
   }
   load();
+  refreshTimer = window.setInterval(() => {
+    if (tab.value === 'orders') loadOrders();
+  }, 2000);
+});
+onBeforeUnmount(() => {
+  window.removeEventListener('popstate', syncRoute);
+  if (refreshTimer) window.clearInterval(refreshTimer);
 });
 </script>
 <template>
@@ -371,11 +593,19 @@ onMounted(() => {
         v-if="tab === 'goods'"
         :products="visibleProducts"
         :query="q"
+        :applied-query="appliedQ"
+        :search-preview="searchPreview"
         :user-role="user.role"
         :company="user.company"
         @query-change="q = $event"
-        @search="load"
+        @search="loadProducts"
         @image-search="chooseImage($event, 'search')"
+        @preview="previewOpen = true"
+        @clear-image="
+          searchPreview = '';
+          q = '';
+          loadProducts();
+        "
         @buy="buy"
       />
       <PurchasesPage
@@ -384,20 +614,40 @@ onMounted(() => {
         :pending-count="pendingOrders.length"
         :completed-count="completedOrders.length"
         :actual-amount="actualAmount"
+        :actual-qty="actualQty"
         :user-role="user.role"
+        :selected-date="selectedDate"
+        :date-caption="dateCaption"
         @complete="complete"
+        @edit="editOrder"
+        @remove="deleteOrder"
+        @select-date="selectDate"
       />
       <ArchivesPage
         v-else-if="tab === 'archive'"
         :stores="stores"
-        :products="products"
+        :products="archiveProducts"
         :user-role="user.role"
         @create-store="createStore"
         @create-product="createProduct"
+        @edit-store="editStore"
+        @delete-store="deleteStore"
         @storefront="uploadStorefront"
-        @product-image="(event, product) => chooseImage(event, 'upload', product)"
+        @product-image="uploadProductImages"
+        @edit-product="editProduct"
+        @toggle-product="toggleProduct"
+        @delete-product="deleteProduct"
       />
-      <ProfilePage v-else :user="user" @logout="logout" />
+      <ProfilePage
+        v-else
+        :user="user"
+        :members="members"
+        @logout="logout"
+        @save-company="saveCompany"
+        @create-member="createMember"
+        @edit-member="editMember"
+        @delete-member="deleteMember"
+      />
 
       <template v-if="false">
         <div class="search">
@@ -522,7 +772,7 @@ onMounted(() => {
             <button v-if="user.role === 'ADMIN'" class="primary" @click="createStore">
               ＋ 新建店铺
             </button>
-            <button v-if="user.role === 'ADMIN'" class="primary" @click="createProduct">
+            <button v-if="user.role === 'ADMIN'" class="primary" @click="createProduct()">
               ＋ 新建商品
             </button>
           </div>
@@ -653,7 +903,15 @@ onMounted(() => {
   <div v-if="dialog" class="modal show" @click.self="dialog = null">
     <section class="sheet">
       <div class="eyebrow">
-        {{ dialog === 'store' ? '供应商店铺' : dialog === 'product' ? '商品档案' : '采购记录' }}
+        {{
+          dialog === 'store'
+            ? '供应商店铺'
+            : dialog === 'product'
+              ? '商品档案'
+              : dialog === 'member'
+                ? '团队账号'
+                : '采购记录'
+        }}
       </div>
       <h2>
         {{
@@ -661,38 +919,104 @@ onMounted(() => {
             ? '加入今日采购'
             : dialog === 'complete'
               ? '确认实际采购'
-              : dialog === 'store'
-                ? '新建店铺'
-                : '新建商品'
+              : dialog === 'editOrder'
+                ? '编辑未完成采购单'
+                : dialog === 'store'
+                  ? activeStore
+                    ? '编辑店铺'
+                    : '新建店铺'
+                  : dialog === 'product'
+                    ? activeProduct
+                      ? '编辑商品档案'
+                      : '添加商品档案'
+                    : activeMember
+                      ? '修改账号'
+                      : '添加子账号'
         }}
       </h2>
-      <strong v-if="activeProduct"
+      <strong v-if="activeProduct && ['buy', 'product'].includes(dialog)"
         >{{ activeProduct.name }} · {{ activeProduct.storeLocation }}</strong
       >
-      <label v-if="dialog === 'store' || dialog === 'product'"
-        ><p>{{ dialog === 'store' ? '店铺名称' : '商品名称' }}</p>
+      <label v-if="['store', 'product', 'member'].includes(dialog)"
+        ><p>
+          {{ dialog === 'store' ? '店铺名称' : dialog === 'member' ? '用户名称' : '商品名称' }}
+        </p>
         <input v-model="form.name"
       /></label>
       <label v-if="dialog === 'store'"
         ><p>档口位置</p>
         <input v-model="form.location" placeholder="例如：1区 3楼 12街 18390"
       /></label>
+      <label v-if="dialog === 'store'"
+        ><p>门头图片</p>
+        <input
+          type="file"
+          accept="image/*"
+          @change="storefrontFile = ($event.target as HTMLInputElement).files?.[0]"
+      /></label>
       <label v-if="dialog === 'product'"
         ><p>商品价格</p>
         <input v-model.number="form.price" type="number" step=".1"
       /></label>
-      <label v-if="dialog === 'buy' || dialog === 'complete'"
-        ><p>{{ dialog === 'buy' ? '采购数量' : '实际采购数量' }}</p>
+      <label v-if="dialog === 'product'"
+        ><p>商品图片（可多选）</p>
+        <input
+          type="file"
+          multiple
+          accept="image/*"
+          @change="productFiles = Array.from(($event.target as HTMLInputElement).files || [])"
+      /></label>
+      <label v-if="dialog === 'product'"
+        ><p>商品状态</p>
+        <select v-model="form.onSale">
+          <option :value="true">上架</option>
+          <option :value="false">下架</option>
+        </select></label
+      >
+      <label v-if="['buy', 'complete', 'editOrder'].includes(dialog)"
+        ><p>{{ dialog === 'complete' ? '实际采购数量' : '计划采购数量' }}</p>
         <input v-model.number="form.qty" type="number" min="1"
       /></label>
       <label v-if="dialog === 'complete'"
         ><p>实际采购单价</p>
         <input v-model.number="form.actualPrice" type="number" step=".1"
       /></label>
-      <label v-if="dialog === 'buy' || dialog === 'complete'"
-        ><p>备注（选填）</p>
-        <textarea v-model="form.remark" rows="3" />
+      <label
+        v-if="['buy', 'editOrder'].includes(dialog) && ['ADMIN', 'OPERATOR'].includes(user?.role)"
+        ><p>运营备注</p>
+        <textarea v-model="form.operatorRemark" rows="3" />
       </label>
+      <label
+        v-if="['complete', 'editOrder'].includes(dialog) && ['ADMIN', 'BUYER'].includes(user?.role)"
+        ><p>买手备注</p>
+        <textarea v-model="form.buyerRemark" rows="3" />
+      </label>
+      <template v-if="dialog === 'member'">
+        <label
+          ><p>登录账号</p>
+          <input v-model="form.account" :disabled="!!activeMember"
+        /></label>
+        <label
+          ><p>{{ activeMember ? '新密码（留空不修改）' : '登录密码' }}</p>
+          <input v-model="form.password" type="password"
+        /></label>
+        <label v-if="!activeMember?.owner"
+          ><p>角色</p>
+          <select v-model="form.role">
+            <option value="ADMIN">管理员</option>
+            <option value="OPERATOR">运营</option>
+            <option value="BUYER">买手</option>
+            <option value="VIEWER">查看者</option>
+          </select></label
+        >
+        <label v-if="!activeMember?.owner"
+          ><p>账号状态</p>
+          <select v-model="form.active">
+            <option :value="true">启用</option>
+            <option :value="false">停用</option>
+          </select></label
+        >
+      </template>
       <button class="primary" @click="submitDialog">确认</button>
     </section>
   </div>
@@ -721,6 +1045,10 @@ onMounted(() => {
         </button>
       </div>
     </section>
+  </div>
+  <div v-if="previewOpen && searchPreview" class="lightbox show" @click.self="previewOpen = false">
+    <button class="lightbox-close" @click="previewOpen = false">×</button>
+    <img :src="searchPreview" alt="以图搜图上传原图" />
   </div>
   <div v-if="message" class="toast show">{{ message }}</div>
 </template>

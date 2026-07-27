@@ -1,10 +1,20 @@
 <script setup lang="ts">
-defineProps<{ products: any[]; query: string; userRole: string; company: string }>();
+import ImageCarousel from '../../components/ImageCarousel.vue';
+defineProps<{
+  products: any[];
+  query: string;
+  appliedQuery: string;
+  userRole: string;
+  company: string;
+  searchPreview: string;
+}>();
 defineEmits<{
   search: [];
   queryChange: [value: string];
   imageSearch: [event: Event];
   buy: [product: any];
+  preview: [];
+  clearImage: [];
 }>();
 </script>
 <template>
@@ -19,26 +29,21 @@ defineEmits<{
       >▣ 以图搜图<input hidden type="file" accept="image/*" @change="$emit('imageSearch', $event)"
     /></label>
   </div>
+  <div v-if="searchPreview" class="image-search-result">
+    <img :src="searchPreview" alt="以图搜图上传图片" @click="$emit('preview')" />
+    <span>已上传搜索图片，点击缩略图可放大查看</span>
+    <button @click="$emit('clearImage')">清除</button>
+  </div>
   <div class="heading">
     <div>
       <div class="eyebrow">{{ company }}采购</div>
-      <h2>{{ query ? `找到 ${products.length} 个相关商品` : '历史热采' }}</h2>
+      <h2>{{ appliedQuery ? `找到 ${products.length} 个相关商品` : '历史热采' }}</h2>
     </div>
     <span>已下架商品不会展示 · 相似检索 Top 20</span>
   </div>
   <div class="grid">
     <article v-for="product in products" :key="product.id" class="card">
-      <div class="carousel">
-        <img
-          v-if="product.images[0]"
-          class="product-photo"
-          :src="product.images[0]"
-          :alt="product.name"
-        />
-        <div v-else class="art coral">饰</div>
-        <div class="dots"><i class="active"></i><i></i><i></i></div>
-        <span class="counter">{{ product.images.length || 1 }} 张</span>
-      </div>
+      <ImageCarousel :images="product.images" :alt="product.name" />
       <div class="body">
         <div class="loc">⌖ {{ product.storeLocation || '档口信息已隐藏' }}</div>
         <h3>{{ product.name }}</h3>

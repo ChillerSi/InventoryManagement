@@ -69,6 +69,22 @@ public class CatalogController {
     return new StoreDto(s.getId(), s.getName(), s.getLocation(), null);
   }
 
+  /** 修改店铺名称和档口位置；门头图片通过独立图片接口替换。 */
+  @PatchMapping("/stores/{id}")
+  StoreDto updateStore(@PathVariable UUID id, @RequestBody StoreInput in) {
+    UserContext.require(Domain.Role.ADMIN);
+    Store store =
+        stores.findByIdAndTenantIdAndDeletedFalse(id, UserContext.get().tenantId()).orElseThrow();
+    if (in.name() != null && !in.name().isBlank()) store.setName(in.name());
+    if (in.location() != null && !in.location().isBlank()) store.setLocation(in.location());
+    stores.save(store);
+    return new StoreDto(
+        store.getId(),
+        store.getName(),
+        store.getLocation(),
+        media.url(store.getStorefrontObjectKey()));
+  }
+
   /** 软删除店铺及其关联商品，保留采购单中的历史快照。 */
   @DeleteMapping("/stores/{id}")
   void deleteStore(@PathVariable UUID id) {

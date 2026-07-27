@@ -2,6 +2,7 @@ package com.yicaitong.controller;
 
 import com.yicaitong.domain.Domain;
 import com.yicaitong.domain.Domain.User;
+import com.yicaitong.repository.TenantRepository;
 import com.yicaitong.repository.UserRepository;
 import com.yicaitong.security.UserContext;
 import java.util.*;
@@ -19,6 +20,7 @@ record UserInput(String name, String account, String password, Domain.Role role,
 /** 管理当前租户的团队子账号；主账号不可停用、变更角色或删除。 */
 public class ProfileController {
   private final UserRepository users;
+  private final TenantRepository tenants;
 
   /** 查询当前租户的主账号和全部子账号，仅管理员可以访问。 */
   @GetMapping
@@ -29,11 +31,19 @@ public class ProfileController {
         .toList();
   }
 
-  /** 创建运营、买手或查看者子账号，不允许创建第二个管理员。 */
+  /** 创建管理员、运营、买手或查看者子账号。 */
   @PostMapping
   UserDto create(@RequestBody UserInput in) {
     UserContext.require(Domain.Role.ADMIN);
-    if (in.role() == Domain.Role.ADMIN) throw new IllegalArgumentException("不能创建第二个管理员");
+    if (in.password() == null || in.password().length() < 6) {
+      throw new IllegalArgumentException("登录密码至少需要 6 位");
+    }
+    users
+        .findByLoginAccountIgnoreCase(in.account())
+        .ifPresent(
+            existing -> {
+              throw new IllegalArgumentException("登录账号已存在");
+            });
     User u = new User();
     u.setTenantId(UserContext.get().tenantId());
     u.setName(in.name());
@@ -54,13 +64,30 @@ public class ProfileController {
             .findById(id)
             .filter(x -> x.getTenantId().equals(UserContext.get().tenantId()))
             .orElseThrow();
-    if (u.isOwner()) throw new IllegalStateException("主账号不可修改");
+    if (u.isOwner() && !u.getId().equals(UserContext.get().userId())) {
+      throw new IllegalStateException("只有主账号本人可以修改主账号资料");
+    }
     if (in.name() != null) u.setName(in.name());
-    if (in.password() != null && !in.password().isBlank()) u.setPassword(in.password());
-    if (in.role() != null && in.role() != Domain.Role.ADMIN) u.setRole(in.role());
-    if (in.active() != null) u.setActive(in.active());
+    if (in.password() != null && !in.password().isBlank()) {
+      if (in.password().length() < 6) throw new IllegalArgumentException("登录密码至少需要 6 位");
+      u.setPassword(in.password());
+    }
+    if (!u.isOwner() && in.role() != null) u.setRole(in.role());
+    if (!u.isOwner() && in.active() != null) u.setActive(in.active());
     users.save(u);
     return dto(u);
+  }
+
+  /** 管理员修改采购公司或团队名称。 */
+  @PatchMapping("/company")
+  Map<String, String> updateCompany(@RequestBody Map<String, String> input) {
+    UserContext.require(Domain.Role.ADMIN);
+    String name = Objects.toString(input.get("name"), "").trim();
+    if (name.isBlank()) throw new IllegalArgumentException("采购主体名称不能为空");
+    var tenant = tenants.findById(UserContext.get().tenantId()).orElseThrow();
+    tenant.setName(name);
+    tenants.save(tenant);
+    return Map.of("name", name);
   }
 
   /** 删除当前租户的子账号，主账号受到服务端保护。 */
