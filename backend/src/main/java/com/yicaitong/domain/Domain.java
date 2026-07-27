@@ -67,6 +67,8 @@ public final class Domain {
     @Column(nullable = false)
     String password;
 
+    String phone;
+
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
     Domain.Role role;

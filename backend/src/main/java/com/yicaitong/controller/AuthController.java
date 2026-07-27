@@ -9,6 +9,7 @@ import com.yicaitong.repository.SessionRepository;
 import com.yicaitong.repository.TenantRepository;
 import com.yicaitong.repository.UserRepository;
 import jakarta.transaction.Transactional;
+import jakarta.validation.Valid;
 import jakarta.validation.constraints.*;
 import java.time.LocalDateTime;
 import java.util.*;
@@ -29,6 +30,7 @@ public class AuthController {
       @NotBlank String company,
       @NotBlank String name,
       @NotBlank String account,
+      @Pattern(regexp = "^1[3-9]\\d{9}$", message = "请输入正确的手机号码") String phone,
       @Size(min = 6) String password) {}
 
   record Login(@NotBlank String account, @NotBlank String password) {}
@@ -38,7 +40,7 @@ public class AuthController {
   /** 创建新租户及其唯一主账号。账号全局唯一，整个过程在同一事务内完成。 */
   @PostMapping("/register")
   @Transactional
-  AuthView register(@RequestBody Register r) {
+  AuthView register(@Valid @RequestBody Register r) {
     users
         .findByLoginAccountIgnoreCase(r.account())
         .ifPresent(
@@ -53,6 +55,7 @@ public class AuthController {
     u.setName(r.name());
     u.setLoginAccount(r.account().trim().toLowerCase());
     u.setPassword(r.password());
+    u.setPhone(r.phone());
     u.setRole(Domain.Role.ADMIN);
     u.setOwner(true);
     users.save(u);
@@ -61,7 +64,7 @@ public class AuthController {
 
   /** 校验账号状态和密码，成功后签发七天有效的随机会话令牌。 */
   @PostMapping("/login")
-  AuthView login(@RequestBody Login r) {
+  AuthView login(@Valid @RequestBody Login r) {
     User u =
         users
             .findByLoginAccountIgnoreCase(r.account())

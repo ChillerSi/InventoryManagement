@@ -4,12 +4,26 @@ import java.util.Map;
 import java.util.Optional;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 
 @Slf4j
 @RestControllerAdvice
 public class GlobalExceptionHandler {
+  /** 将请求体字段校验错误转换为前端可直接展示的 400 响应。 */
+  @ExceptionHandler(MethodArgumentNotValidException.class)
+  ResponseEntity<Map<String, Object>> handleValidationException(
+      MethodArgumentNotValidException exception) {
+    String message =
+        exception.getBindingResult().getFieldErrors().stream()
+            .findFirst()
+            .map(error -> error.getDefaultMessage())
+            .orElse("请求参数不正确");
+    log.warn("请求参数校验失败: message={}", message);
+    return ResponseEntity.badRequest().body(Map.of("message", message));
+  }
+
   @ExceptionHandler(ApiException.class)
   ResponseEntity<Map<String, Object>> handleApiException(ApiException exception) {
     log.warn(

@@ -120,11 +120,11 @@ main {
   overflow: hidden;
   display: grid;
   grid-template-columns: 280px 1fr;
-  min-height: 190px;
+  height: 210px;
 }
 .carousel {
   height: 100%;
-  min-height: 190px;
+  min-height: 210px;
   position: relative;
   overflow: hidden;
   background: #e8ddce;
@@ -132,9 +132,21 @@ main {
 .product-photo {
   width: 100%;
   height: 100%;
-  min-height: 190px;
+  min-height: 210px;
   object-fit: cover;
   display: block;
+}
+.map-pin {
+  display: inline-grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  margin-right: 4px;
+  border-radius: 50%;
+  background: #e1ece0;
+  color: var(--green);
+  font-size: 16px;
+  box-shadow: inset 0 0 0 1px #c8d9cd;
 }
 .art {
   height: 100%;
@@ -668,6 +680,88 @@ nav b {
   border-color: var(--green);
   background: var(--green);
 }
+.record-action .delete,
+.member-actions .delete {
+  color: #fff;
+  border-color: #c94a3b;
+  background: #c94a3b;
+}
+.record-action .delete:hover,
+.member-actions .delete:hover {
+  background: #a9362b;
+}
+.record-action .enter-button {
+  color: white;
+  border-color: var(--green);
+  background: var(--green);
+  box-shadow: 0 4px 12px #1f654b28;
+}
+.role-guide {
+  margin-top: 18px;
+}
+.role-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  margin-top: 14px;
+}
+.role-grid > div {
+  padding: 15px;
+  border: 1px solid #dfe5dc;
+  border-radius: 14px;
+  background: #f8faf6;
+}
+.role-grid strong {
+  display: block;
+  margin-bottom: 5px;
+  color: #17372d;
+}
+.role-grid p {
+  margin: 0;
+  color: #718078;
+  line-height: 1.6;
+}
+.confirm-dialog {
+  width: min(92vw, 420px);
+  padding: 28px;
+  text-align: center;
+  border-radius: 18px;
+  background: white;
+  box-shadow: 0 24px 70px #3b17174a;
+}
+.warning-icon {
+  width: 54px;
+  height: 54px;
+  margin: 0 auto 12px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: #fff0ed;
+  color: #c94a3b;
+  font-size: 30px;
+  font-weight: bold;
+}
+.confirm-dialog h2 {
+  margin: 8px 0;
+  color: #932f26;
+}
+.confirm-dialog p {
+  color: var(--muted);
+  line-height: 1.65;
+}
+.confirm-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  margin-top: 20px;
+}
+.danger-button {
+  border: 0;
+  border-radius: 9px;
+  background: #c94a3b;
+  color: white;
+  font-weight: bold;
+}
 .profile {
   background: linear-gradient(135deg, #20302b, #3f6657);
   color: white;
@@ -1025,6 +1119,9 @@ nav b {
   font-size: 11px;
 }
 @media (max-width: 700px) {
+  .role-grid {
+    grid-template-columns: 1fr;
+  }
   header,
   main {
     padding-left: 18px;
@@ -1056,6 +1153,7 @@ nav b {
 @media (max-width: 520px) {
   .card {
     grid-template-columns: 1fr;
+    height: auto;
   }
   .carousel,
   .art,

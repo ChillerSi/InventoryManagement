@@ -10,9 +10,16 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
 
 record UserDto(
-    UUID id, String name, String account, Domain.Role role, boolean active, boolean owner) {}
+    UUID id,
+    String name,
+    String account,
+    String phone,
+    Domain.Role role,
+    boolean active,
+    boolean owner) {}
 
-record UserInput(String name, String account, String password, Domain.Role role, Boolean active) {}
+record UserInput(
+    String name, String account, String phone, String password, Domain.Role role, Boolean active) {}
 
 @RestController
 @RequestMapping("/api/users")
@@ -35,9 +42,11 @@ public class ProfileController {
   @PostMapping
   UserDto create(@RequestBody UserInput in) {
     UserContext.require(Domain.Role.ADMIN);
+    requireOwner();
     if (in.password() == null || in.password().length() < 6) {
       throw new IllegalArgumentException("登录密码至少需要 6 位");
     }
+    validateOptionalPhone(in.phone());
     users
         .findByLoginAccountIgnoreCase(in.account())
         .ifPresent(
@@ -49,6 +58,7 @@ public class ProfileController {
     u.setName(in.name());
     u.setLoginAccount(in.account().toLowerCase());
     u.setPassword(in.password());
+    u.setPhone(normalizePhone(in.phone()));
     u.setRole(in.role());
     u.setActive(in.active() == null || in.active());
     users.save(u);
@@ -68,6 +78,10 @@ public class ProfileController {
       throw new IllegalStateException("只有主账号本人可以修改主账号资料");
     }
     if (in.name() != null) u.setName(in.name());
+    if (in.phone() != null) {
+      validateOptionalPhone(in.phone());
+      u.setPhone(normalizePhone(in.phone()));
+    }
     if (in.password() != null && !in.password().isBlank()) {
       if (in.password().length() < 6) throw new IllegalArgumentException("登录密码至少需要 6 位");
       u.setPassword(in.password());
@@ -82,6 +96,7 @@ public class ProfileController {
   @PatchMapping("/company")
   Map<String, String> updateCompany(@RequestBody Map<String, String> input) {
     UserContext.require(Domain.Role.ADMIN);
+    requireOwner();
     String name = Objects.toString(input.get("name"), "").trim();
     if (name.isBlank()) throw new IllegalArgumentException("采购主体名称不能为空");
     var tenant = tenants.findById(UserContext.get().tenantId()).orElseThrow();
@@ -105,6 +120,27 @@ public class ProfileController {
 
   UserDto dto(User u) {
     return new UserDto(
-        u.getId(), u.getName(), u.getLoginAccount(), u.getRole(), u.isActive(), u.isOwner());
+        u.getId(),
+        u.getName(),
+        u.getLoginAccount(),
+        u.getPhone(),
+        u.getRole(),
+        u.isActive(),
+        u.isOwner());
+  }
+
+  private void requireOwner() {
+    User current = users.findById(UserContext.get().userId()).orElseThrow();
+    if (!current.isOwner()) throw new IllegalStateException("只有主账号可以执行此操作");
+  }
+
+  private void validateOptionalPhone(String phone) {
+    if (phone != null && !phone.isBlank() && !phone.matches("^1[3-9]\\d{9}$")) {
+      throw new IllegalArgumentException("请输入正确的手机号码");
+    }
+  }
+
+  private String normalizePhone(String phone) {
+    return phone == null || phone.isBlank() ? null : phone.trim();
   }
 }

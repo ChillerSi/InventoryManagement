@@ -1,7 +1,8 @@
 <script setup lang="ts">
+import { computed } from 'vue';
 import ImageCarousel from '../../components/ImageCarousel.vue';
 
-defineProps<{
+const props = defineProps<{
   orders: any[];
   pendingCount: number;
   completedCount: number;
@@ -24,6 +25,21 @@ const dateOffset = (days: number) => {
 };
 const isCarryover = (order: any) =>
   order.status !== 'COMPLETED' && order.createdAt.slice(0, 10) < dateOffset(0);
+const sortedOrders = computed(() =>
+  [...props.orders].sort((first, second) => {
+    const firstCompleted = first.status === 'COMPLETED';
+    const secondCompleted = second.status === 'COMPLETED';
+    if (firstCompleted !== secondCompleted) return firstCompleted ? 1 : -1;
+    if (firstCompleted) {
+      return String(second.completedAt || '').localeCompare(String(first.completedAt || ''));
+    }
+    return String(first.storeLocation || '').localeCompare(
+      String(second.storeLocation || ''),
+      'zh-CN',
+      { numeric: true },
+    );
+  }),
+);
 </script>
 
 <template>
@@ -77,7 +93,7 @@ const isCarryover = (order: any) =>
   </div>
   <div class="route">↗ 今日待办已按档口位置排好路线 · 每 2 秒自动刷新</div>
   <article
-    v-for="(order, index) in orders"
+    v-for="(order, index) in sortedOrders"
     :key="order.id"
     class="order"
     :class="{ done: order.status === 'COMPLETED', carryover: isCarryover(order) }"
@@ -90,7 +106,11 @@ const isCarryover = (order: any) =>
         order.status === 'COMPLETED' ? '✓ 已完成' : `第 ${index + 1} 站`
       }}</span>
       <strong>⌖ {{ order.storeLocation || '档口信息已隐藏' }}</strong>
-      <small>{{ order.storeName || '供应商信息已隐藏' }}　{{ order.productName }}</small>
+      <small
+        >{{ order.storeName || '供应商信息已隐藏' }}　{{ order.productName }} · 商品价 ¥{{
+          Number(order.productPrice || 0).toFixed(2)
+        }}</small
+      >
       <span v-if="isCarryover(order)" class="carryover-note"
         >跨天订单－创建于 {{ order.createdAt.slice(0, 10) }}</span
       >

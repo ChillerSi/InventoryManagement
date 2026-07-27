@@ -5,7 +5,7 @@ defineEmits<{ switch: [mode: 'login' | 'register']; submit: [] }>();
 <template>
   <div class="auth-screen">
     <section class="auth-card">
-      <div class="eyebrow">YIWU PROCUREMENT</div>
+      <div class="eyebrow">PROCUREMENT</div>
       <h1>欢迎使用采购后台</h1>
       <p class="auth-intro">首次使用请注册主账号；已有主账号或子账户可直接登录。</p>
       <div class="auth-tabs">
@@ -16,6 +16,9 @@ defineEmits<{ switch: [mode: 'login' | 'register']; submit: [] }>();
       </div>
       <label v-if="mode === 'register'">采购公司或团队名称<input v-model="form.company" /></label>
       <label v-if="mode === 'register'">用户姓名<input v-model="form.name" /></label>
+      <label v-if="mode === 'register'"
+        >手机号<input v-model="form.phone" inputmode="numeric" maxlength="11"
+      /></label>
       <label>登录账号<input v-model="form.account" /></label
       ><label>登录密码<input v-model="form.password" type="password" /></label>
       <label v-if="mode === 'register'"
@@ -24,7 +27,7 @@ defineEmits<{ switch: [mode: 'login' | 'register']; submit: [] }>();
       <button class="auth-primary" @click="$emit('submit')">
         {{ mode === 'login' ? '进入采购后台' : '创建采购后台' }}
       </button>
-      <div class="support-contact">义乌采购团队数字化工作台</div>
+      <div class="support-contact">采购团队数字化工作台</div>
     </section>
   </div>
 </template>

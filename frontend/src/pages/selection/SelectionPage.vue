@@ -43,9 +43,11 @@ defineEmits<{
   </div>
   <div class="grid">
     <article v-for="product in products" :key="product.id" class="card">
-      <ImageCarousel :images="product.images" :alt="product.name" />
+      <ImageCarousel :images="product.images" :alt="product.name" auto />
       <div class="body">
-        <div class="loc">⌖ {{ product.storeLocation || '档口信息已隐藏' }}</div>
+        <div class="loc">
+          <span class="map-pin">⌖</span> {{ product.storeLocation || '档口信息已隐藏' }}
+        </div>
         <h3>{{ product.name }}</h3>
         <p>
           {{ product.storeName || '供应商信息已隐藏' }} · 历史采购

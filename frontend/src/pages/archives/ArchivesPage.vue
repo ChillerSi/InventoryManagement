@@ -51,7 +51,7 @@ const selectedStore = ref<any>();
             </p>
           </div>
           <div class="record-action">
-            <button @click="selectedStore = store">进入商品列表</button
+            <button class="enter-button" @click="selectedStore = store">进入商品列表 →</button
             ><button v-if="userRole === 'ADMIN'" @click="$emit('editStore', store)">编辑店铺</button
             ><button
               v-if="userRole === 'ADMIN'"

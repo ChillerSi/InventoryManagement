@@ -44,8 +44,20 @@ const user = ref<User>(JSON.parse(localStorage.getItem('auth') || 'null') as Use
   selectedDate = ref(new Date().toISOString().slice(0, 10)),
   message = ref('');
 const authMode = ref<'login' | 'register'>('login'),
-  auth = ref({ company: '', name: '', account: '', password: '', confirmPassword: '' });
+  auth = ref({
+    company: '',
+    name: '',
+    account: '',
+    phone: '',
+    password: '',
+    confirmPassword: '',
+  });
 const dialog = ref<'buy' | 'complete' | 'editOrder' | 'store' | 'product' | 'member' | null>(null),
+  confirmState = ref<{
+    title: string;
+    message: string;
+    action: () => Promise<void>;
+  }>(),
   activeProduct = ref<Product>(),
   activeOrder = ref<any>(),
   activeStore = ref<Store>(),
@@ -55,6 +67,7 @@ const dialog = ref<'buy' | 'complete' | 'editOrder' | 'store' | 'product' | 'mem
   form = ref({
     name: '',
     account: '',
+    phone: '',
     password: '',
     role: 'OPERATOR',
     active: true,
@@ -115,6 +128,9 @@ async function submitAuth() {
   try {
     if (authMode.value === 'register' && auth.value.password !== auth.value.confirmPassword) {
       return notify('登录密码和确认密码不一致');
+    }
+    if (authMode.value === 'register' && !/^1[3-9]\d{9}$/.test(auth.value.phone)) {
+      return notify('请输入正确的手机号码');
     }
     user.value = await api('/auth/' + authMode.value, {
       method: 'POST',
@@ -177,10 +193,15 @@ function editStore(store: Store) {
   dialog.value = 'store';
 }
 async function deleteStore(store: Store) {
-  if (!confirm(`确认删除店铺“${store.name}”吗？其商品也会软删除，历史采购记录保留。`)) return;
-  await api(`/stores/${store.id}`, { method: 'DELETE' });
-  notify('店铺已软删除');
-  await load();
+  confirmState.value = {
+    title: '确认删除店铺',
+    message: `删除“${store.name}”后，该店铺及其商品将不再展示。是否继续？`,
+    action: async () => {
+      await api(`/stores/${store.id}`, { method: 'DELETE' });
+      notify('店铺已删除');
+      await load();
+    },
+  };
 }
 async function createProduct(store?: Store) {
   if (!stores.value.length) return notify('请先创建店铺');
@@ -210,10 +231,15 @@ async function toggleProduct(product: Product) {
   await load();
 }
 async function deleteProduct(product: Product) {
-  if (!confirm(`确认删除商品“${product.name}”吗？数据库仅做软删除。`)) return;
-  await api(`/products/${product.id}`, { method: 'DELETE' });
-  notify('商品已软删除');
-  await load();
+  confirmState.value = {
+    title: '确认删除商品',
+    message: `确认删除商品“${product.name}”吗？删除后将不再展示。`,
+    action: async () => {
+      await api(`/products/${product.id}`, { method: 'DELETE' });
+      notify('商品已删除');
+      await load();
+    },
+  };
 }
 function editOrder(order: any) {
   activeOrder.value = order;
@@ -226,9 +252,15 @@ function editOrder(order: any) {
   dialog.value = 'editOrder';
 }
 async function deleteOrder(order: any) {
-  if (!confirm(`确认删除“${order.productName}”采购任务吗？`)) return;
-  await api(`/purchase-orders/${order.id}`, { method: 'DELETE' });
-  await loadOrders();
+  confirmState.value = {
+    title: '警告：删除采购订单',
+    message: `确认删除“${order.productName}”采购任务吗？此操作不可撤销。`,
+    action: async () => {
+      await api(`/purchase-orders/${order.id}`, { method: 'DELETE' });
+      await loadOrders();
+      notify('采购订单已删除');
+    },
+  };
 }
 function createMember() {
   activeMember.value = undefined;
@@ -236,6 +268,7 @@ function createMember() {
     ...form.value,
     name: '',
     account: '',
+    phone: '',
     password: '',
     role: 'OPERATOR',
     active: true,
@@ -248,6 +281,7 @@ function editMember(member: any) {
     ...form.value,
     name: member.name,
     account: member.account,
+    phone: member.phone || '',
     password: '',
     role: member.role,
     active: member.active,
@@ -258,6 +292,11 @@ async function deleteMember(member: any) {
   if (!confirm(`确认删除子账号“${member.name}”吗？`)) return;
   await api(`/users/${member.id}`, { method: 'DELETE' });
   members.value = await api('/users');
+}
+async function executeConfirm() {
+  const pending = confirmState.value;
+  confirmState.value = undefined;
+  if (pending) await pending.action();
 }
 async function saveCompany(name: string) {
   const result = await api('/users/company', {
@@ -323,6 +362,7 @@ async function submitDialog() {
       body: JSON.stringify({
         name: form.value.name,
         account: form.value.account,
+        phone: form.value.phone,
         password: form.value.password,
         role: form.value.role,
         active: form.value.active,
@@ -538,6 +578,9 @@ const actualAmount = computed(() =>
 const actualQty = computed(() =>
   completedOrders.value.reduce((sum, order) => sum + Number(order.actualQty || 0), 0),
 );
+const canManageOwner = computed(
+  () => members.value.find((member) => member.id === user.value?.userId)?.owner === true,
+);
 const dateCaption = computed(() => {
   const offset = (days: number) => {
     const date = new Date();
@@ -642,6 +685,7 @@ onBeforeUnmount(() => {
         v-else
         :user="user"
         :members="members"
+        :can-manage-owner="canManageOwner"
         @logout="logout"
         @save-company="saveCompany"
         @create-member="createMember"
@@ -900,6 +944,18 @@ onBeforeUnmount(() => {
     </nav>
   </div>
 
+  <div v-if="confirmState" class="modal show warning-modal" @click.self="confirmState = undefined">
+    <section class="confirm-dialog">
+      <div class="warning-icon">!</div>
+      <h2>{{ confirmState.title }}</h2>
+      <p>{{ confirmState.message }}</p>
+      <div class="confirm-actions">
+        <button class="ghost" @click="confirmState = undefined">取消</button>
+        <button class="danger-button" @click="executeConfirm">确认删除</button>
+      </div>
+    </section>
+  </div>
+
   <div v-if="dialog" class="modal show" @click.self="dialog = null">
     <section class="sheet">
       <div class="eyebrow">
@@ -995,6 +1051,10 @@ onBeforeUnmount(() => {
         <label
           ><p>登录账号</p>
           <input v-model="form.account" :disabled="!!activeMember"
+        /></label>
+        <label
+          ><p>手机号（选填）</p>
+          <input v-model="form.phone" inputmode="numeric" maxlength="11"
         /></label>
         <label
           ><p>{{ activeMember ? '新密码（留空不修改）' : '登录密码' }}</p>
