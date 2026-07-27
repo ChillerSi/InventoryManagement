@@ -173,14 +173,18 @@ main {
 }
 .counter {
   position: absolute;
-  z-index: 2;
+  z-index: 3;
+  top: 12px;
   right: 12px;
-  bottom: 10px;
-  background: #20302bc9;
+  bottom: auto;
+  border: 1px solid #ffffff80;
+  background: #20302be6;
   color: white;
   border-radius: 20px;
   padding: 5px 9px;
   font-size: 10px;
+  line-height: 1;
+  box-shadow: 0 2px 8px #0003;
 }
 .dots {
   position: absolute;
