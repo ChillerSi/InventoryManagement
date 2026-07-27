@@ -126,6 +126,12 @@ public class CatalogController {
                             + Objects.toString(p.storeLocation(), ""))
                         .toLowerCase()
                         .contains(query))
+        // 选品中心和结构化搜索均优先展示历史实际采购件数更多的商品。
+        .sorted(
+            Comparator.comparingLong(ProductDto::totalPurchasedQty)
+                .reversed()
+                .thenComparing(ProductDto::name)
+                .thenComparing(ProductDto::id))
         .toList();
   }
 
