@@ -705,7 +705,7 @@ nav b {
   gap: 12px;
   margin-top: 14px;
 }
-.role-grid > div {
+.role-grid > article {
   padding: 15px;
   border: 1px solid #dfe5dc;
   border-radius: 14px;
@@ -873,7 +873,15 @@ nav b {
   padding: 7px 10px;
 }
 .member-actions .delete {
-  color: #b34d3e;
+  color: #ad392d;
+  border-color: #e9b8b1;
+  background: #fff4f2;
+  font-weight: 700;
+}
+.member-actions .delete:hover {
+  color: #8f291f;
+  border-color: #d88f85;
+  background: #ffe8e4;
 }
 .tenant-notice {
   margin: 12px 0 0;

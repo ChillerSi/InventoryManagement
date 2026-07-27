@@ -69,7 +69,6 @@ defineEmits<{
   </section>
   <section class="role-guide">
     <div class="eyebrow">角色权限说明</div>
-    <h3>不同角色可以使用哪些功能？</h3>
     <div class="role-grid">
       <article>
         <strong>管理员</strong>
