@@ -1,5 +1,6 @@
 package com.yicaitong.security;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.yicaitong.domain.Domain.Session;
 import com.yicaitong.exception.ApiException;
 import com.yicaitong.repository.SessionRepository;
@@ -9,6 +10,7 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
 import java.time.LocalDateTime;
+import java.util.Map;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Component;
@@ -19,6 +21,7 @@ import org.springframework.web.filter.OncePerRequestFilter;
 /** 校验 Bearer 会话令牌，并从数据库会话构建不可由客户端覆盖的租户上下文。 */
 public class AuthFilter extends OncePerRequestFilter {
   private final SessionRepository sessions;
+  private final ObjectMapper objectMapper;
 
   @Override
   protected void doFilterInternal(
@@ -44,6 +47,12 @@ public class AuthFilter extends OncePerRequestFilter {
       UserContext.set(
           new CurrentUser(session.getUserId(), session.getTenantId(), session.getRole()));
       filterChain.doFilter(request, response);
+    } catch (ApiException exception) {
+      response.setStatus(exception.getStatus().value());
+      response.setCharacterEncoding("UTF-8");
+      response.setContentType("application/json");
+      objectMapper.writeValue(
+          response.getOutputStream(), Map.of("message", exception.getMessage()));
     } finally {
       UserContext.clear();
     }

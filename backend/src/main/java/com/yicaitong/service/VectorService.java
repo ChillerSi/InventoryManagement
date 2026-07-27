@@ -8,10 +8,14 @@ import java.util.Map;
 import java.util.UUID;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.io.ByteArrayResource;
+import org.springframework.http.HttpEntity;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
-import org.springframework.http.client.MultipartBodyBuilder;
 import org.springframework.stereotype.Service;
+import org.springframework.util.LinkedMultiValueMap;
+import org.springframework.util.MultiValueMap;
 import org.springframework.web.client.RestClient;
+import org.springframework.web.client.RestTemplate;
 
 @Service
 /** 封装 SigLIP 向量服务和 Qdrant 索引、检索调用，不承担业务权限判断。 */
@@ -32,27 +36,27 @@ public class VectorService {
   double threshold;
 
   private final RestClient rest = RestClient.create();
+  private final RestTemplate multipartClient = new RestTemplate();
 
   /** 调用 Python SigLIP 服务，将裁剪后的图片转换为归一化向量。 */
   public EmbeddingResult embed(byte[] bytes, String contentType) {
-    MultipartBodyBuilder builder = new MultipartBodyBuilder();
-    builder
-        .part(
-            "file",
-            new ByteArrayResource(bytes) {
-              @Override
-              public String getFilename() {
-                return "crop.jpg";
-              }
-            })
-        .contentType(MediaType.parseMediaType(contentType == null ? "image/jpeg" : contentType));
+    ByteArrayResource resource =
+        new ByteArrayResource(bytes) {
+          @Override
+          public String getFilename() {
+            return "crop.jpg";
+          }
+        };
+    HttpHeaders fileHeaders = new HttpHeaders();
+    fileHeaders.setContentType(
+        MediaType.parseMediaType(contentType == null ? "image/jpeg" : contentType));
+    MultiValueMap<String, Object> parts = new LinkedMultiValueMap<>();
+    parts.add("file", new HttpEntity<>(resource, fileHeaders));
+    HttpHeaders requestHeaders = new HttpHeaders();
+    requestHeaders.setContentType(MediaType.MULTIPART_FORM_DATA);
     JsonNode node =
-        rest.post()
-            .uri(embedding + "/embed")
-            .contentType(MediaType.MULTIPART_FORM_DATA)
-            .body(builder.build())
-            .retrieve()
-            .body(JsonNode.class);
+        multipartClient.postForObject(
+            embedding + "/embed", new HttpEntity<>(parts, requestHeaders), JsonNode.class);
     String modelVersion = node.path("modelVersion").asText();
     if (!expectedModelVersion.equals(modelVersion)) {
       throw new IllegalStateException(
@@ -67,11 +71,7 @@ public class VectorService {
   }
 
   /** 将图片向量写入 Qdrant；payload 只保留租户隔离字段和 MySQL 商品主键。 */
-  public void index(
-      UUID pointId,
-      UUID tenantId,
-      UUID productId,
-      EmbeddingResult embeddingResult) {
+  public void index(UUID pointId, UUID tenantId, UUID productId, EmbeddingResult embeddingResult) {
     ensureCollection(embeddingResult.vector().size());
     rest.put()
         .uri(qdrant + "/collections/" + collection + "/points?wait=true")
@@ -87,17 +87,13 @@ public class VectorService {
                         embeddingResult.vector(),
                         "payload",
                         Map.of(
-                            "tenantId",
-                            tenantId.toString(),
-                            "productId",
-                            productId.toString())))))
+                            "tenantId", tenantId.toString(), "productId", productId.toString())))))
         .retrieve()
         .toBodilessEntity();
   }
 
   /** 在 Qdrant 中强制按 tenantId 过滤并按商品聚合最高相似度。 */
-  public List<Map<String, Object>> search(
-      UUID tenantId, EmbeddingResult embeddingResult, int top) {
+  public List<Map<String, Object>> search(UUID tenantId, EmbeddingResult embeddingResult, int top) {
     JsonNode response =
         rest.post()
             .uri(qdrant + "/collections/" + collection + "/points/search")

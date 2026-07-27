@@ -1,5 +1,28 @@
 # 义采通 Inventory Management
 
+## Windows 本地原生运行
+
+本机依赖统一安装在 `D:\InventoryRuntime`，不依赖 Docker。后端和前端完成首次构建后执行：
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\windows\start-local.ps1
+```
+
+停止本项目服务：
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\windows\stop-local.ps1
+```
+
+- 前端：`http://127.0.0.1:5173`
+- MinIO 控制台：`http://127.0.0.1:9001`
+- Qdrant 控制台：`http://127.0.0.1:6333/dashboard`
+- SigLIP2：`http://127.0.0.1:8000/health`
+
+当前固定版本为 MySQL 8.4.10、MinIO RELEASE.2025-09-07T16-13-09Z、Qdrant
+1.18.2、Temurin JDK 21.0.11+10，以及
+`google/siglip2-base-patch16-224@75de2d55ec2d0b4efc50b3e9ad70dba96a7b2fa2`。
+
 基于原型实现的可运行 MVP：
 
 - `frontend`：Vue 3 + TypeScript + Vite，包含注册/登录、选品中心、今日采购、档案管理、我的。

@@ -69,15 +69,12 @@ public class ImageController {
   /**
    * 接收一张原图和多个原图像素坐标，由服务端逐框裁剪、保存和向量化。
    *
-   * <p>坐标原点位于原图左上角，最多允许 20 个框。原图只在 MinIO 和 MySQL 保存一次；裁剪区域仅在内存中用于
-   * SigLIP 建模，不写入 MinIO。每个区域生成独立 Qdrant point，payload 只保存租户和商品主键；店铺与位置从
-   * MySQL 关联查询。
+   * <p>坐标原点位于原图左上角，最多允许 20 个框。原图只在 MinIO 和 MySQL 保存一次；裁剪区域仅在内存中用于 SigLIP 建模，不写入 MinIO。每个区域生成独立
+   * Qdrant point，payload 只保存租户和商品主键；店铺与位置从 MySQL 关联查询。
    */
   @PostMapping("/products/{productId}/regions")
   ProductDto uploadRegions(
-      @PathVariable UUID productId,
-      @RequestPart MultipartFile file,
-      @RequestPart String regions)
+      @PathVariable UUID productId, @RequestPart MultipartFile file, @RequestPart String regions)
       throws Exception {
     UserContext.require(Domain.Role.ADMIN);
     Product product = catalog.owned(productId);
@@ -123,11 +120,7 @@ public class ImageController {
       ImageIO.write(crop, "jpg", output);
       try {
         EmbeddingResult embedding = vectors.embed(output.toByteArray(), "image/jpeg");
-        vectors.index(
-            UUID.randomUUID(),
-            sourceImage.getTenantId(),
-            productId,
-            embedding);
+        vectors.index(UUID.randomUUID(), sourceImage.getTenantId(), productId, embedding);
         readyCount++;
         modelVersion = embedding.modelVersion();
       } catch (Exception exception) {
@@ -171,8 +164,7 @@ public class ImageController {
         .filter(entry -> entry.getKey() != null)
         .map(
             entry ->
-                Map.<String, Object>of(
-                    "product", entry.getKey(), "similarity", entry.getValue()))
+                Map.<String, Object>of("product", entry.getKey(), "similarity", entry.getValue()))
         .toList();
   }
 
