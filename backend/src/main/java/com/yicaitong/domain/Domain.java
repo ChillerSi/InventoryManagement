@@ -200,6 +200,7 @@ public final class Domain {
 
     UUID buyerUserId;
     int planQty;
+    boolean urgent;
     Integer actualQty;
     BigDecimal actualPrice;
 

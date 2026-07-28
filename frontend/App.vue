@@ -75,6 +75,7 @@ const dialog = ref<'buy' | 'complete' | 'editOrder' | 'store' | 'product' | 'mem
     price: 0,
     onSale: true,
     qty: 100,
+    urgent: false,
     actualPrice: 0,
     remark: '',
     operatorRemark: '',
@@ -166,7 +167,13 @@ async function selectDate(date: string) {
 }
 async function buy(p: Product) {
   activeProduct.value = p;
-  form.value = { ...form.value, qty: 100, operatorRemark: '', buyerRemark: '' };
+  form.value = {
+    ...form.value,
+    qty: 100,
+    urgent: false,
+    operatorRemark: '',
+    buyerRemark: '',
+  };
   dialog.value = 'buy';
 }
 async function complete(o: any) {
@@ -314,6 +321,7 @@ async function submitDialog() {
       body: JSON.stringify({
         productId: activeProduct.value.id,
         planQty: form.value.qty,
+        urgent: form.value.urgent,
         operatorRemark: form.value.operatorRemark,
       }),
     });
@@ -1052,6 +1060,10 @@ onBeforeUnmount(() => {
         ><p>{{ dialog === 'complete' ? '实际采购数量' : '计划采购数量' }}</p>
         <input v-model.number="form.qty" type="number" min="1"
       /></label>
+      <label v-if="dialog === 'buy'" class="urgent-option">
+        <input v-model="form.urgent" type="checkbox" />
+        <span><strong>急采</strong><small>勾选后，今日采购任务会显示火焰标识</small></span>
+      </label>
       <label v-if="dialog === 'complete'"
         ><p>实际采购单价</p>
         <input v-model.number="form.actualPrice" type="number" min="0" step=".01"

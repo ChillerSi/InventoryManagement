@@ -388,6 +388,7 @@ nav b {
   font-weight: bold;
 }
 .order {
+  position: relative;
   background: white;
   border: 1px solid var(--line);
   border-radius: 14px;
@@ -397,6 +398,28 @@ nav b {
   grid-template-columns: 96px minmax(300px, 2fr) minmax(145px, 0.65fr) auto;
   align-items: center;
   gap: 16px;
+}
+.urgent-badge {
+  position: absolute;
+  z-index: 4;
+  top: 10px;
+  right: 12px;
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 4px 8px;
+  border: 1px solid #f2ad6f;
+  border-radius: 999px;
+  background: #fff1df;
+  color: #b64d13;
+  box-shadow: 0 3px 10px #d86d2929;
+  font-size: 17px;
+  line-height: 1;
+}
+.urgent-badge small {
+  color: #a9400d;
+  font-size: 10px;
+  font-weight: 800;
 }
 .order.done {
   opacity: 0.68;
@@ -956,6 +979,36 @@ nav b {
   border-radius: 9px;
   margin: 7px 0 13px;
   background: white;
+}
+.sheet .urgent-option {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 2px 0 16px;
+  padding: 12px 14px;
+  border: 1px solid #f0c18f;
+  border-radius: 11px;
+  background: #fff7ea;
+  cursor: pointer;
+}
+.sheet .urgent-option input {
+  width: 19px;
+  height: 19px;
+  margin: 0;
+  padding: 0;
+  accent-color: #dc681d;
+}
+.urgent-option span {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+.urgent-option strong {
+  color: #9d3e0b;
+}
+.urgent-option small {
+  color: #8b6b58;
+  font-size: 11px;
 }
 .lightbox {
   position: fixed;

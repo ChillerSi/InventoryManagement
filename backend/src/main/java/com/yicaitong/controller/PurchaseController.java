@@ -18,7 +18,7 @@ import java.util.*;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
 
-record OrderInput(UUID productId, int planQty, String operatorRemark) {}
+record OrderInput(UUID productId, int planQty, boolean urgent, String operatorRemark) {}
 
 record CompleteInput(int actualQty, BigDecimal actualPrice, String buyerRemark) {}
 
@@ -32,6 +32,7 @@ record OrderDto(
     String storeName,
     String storeLocation,
     int planQty,
+    boolean urgent,
     Integer actualQty,
     BigDecimal actualPrice,
     String operatorRemark,
@@ -97,6 +98,7 @@ public class PurchaseController {
     o.setStoreId(s.getId());
     o.setCreatorUserId(UserContext.get().userId());
     o.setPlanQty(in.planQty());
+    o.setUrgent(in.urgent());
     o.setOperatorRemark(in.operatorRemark());
     o.setProductNameSnapshot(p.getName());
     o.setStoreNameSnapshot(s.getName());
@@ -172,6 +174,7 @@ public class PurchaseController {
         visible ? o.getStoreNameSnapshot() : null,
         visible ? o.getStoreLocationSnapshot() : null,
         o.getPlanQty(),
+        o.isUrgent(),
         o.getActualQty(),
         o.getActualPrice(),
         o.getOperatorRemark(),

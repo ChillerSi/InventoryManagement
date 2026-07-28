@@ -98,6 +98,9 @@ const sortedOrders = computed(() =>
     class="order"
     :class="{ done: order.status === 'COMPLETED', carryover: isCarryover(order) }"
   >
+    <span v-if="order.urgent" class="urgent-badge" title="急采任务" aria-label="急采任务"
+      >🔥<small>急采</small></span
+    >
     <div class="order-gallery">
       <ImageCarousel :images="order.images || []" :alt="order.productName" compact />
     </div>
