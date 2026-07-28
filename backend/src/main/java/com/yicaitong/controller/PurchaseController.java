@@ -164,15 +164,17 @@ public class PurchaseController {
   }
 
   OrderDto dto(PurchaseOrder o) {
-    boolean visible =
-        Set.of(Domain.Role.ADMIN, Domain.Role.BUYER).contains(UserContext.get().role());
+    Domain.Role role = UserContext.get().role();
+    boolean storeNameVisible =
+        Set.of(Domain.Role.ADMIN, Domain.Role.OPERATOR, Domain.Role.BUYER).contains(role);
+    boolean storeLocationVisible = Set.of(Domain.Role.ADMIN, Domain.Role.BUYER).contains(role);
     return new OrderDto(
         o.getId(),
         o.getProductId(),
         o.getProductNameSnapshot(),
         products.findById(o.getProductId()).map(Product::getPrice).orElse(BigDecimal.ZERO),
-        visible ? o.getStoreNameSnapshot() : null,
-        visible ? o.getStoreLocationSnapshot() : null,
+        storeNameVisible ? o.getStoreNameSnapshot() : null,
+        storeLocationVisible ? o.getStoreLocationSnapshot() : null,
         o.getPlanQty(),
         o.isUrgent(),
         o.getActualQty(),

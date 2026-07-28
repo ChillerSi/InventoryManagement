@@ -183,8 +183,10 @@ public class CatalogController {
   public ProductDto dto(Product p) {
     Store s =
         stores.findByIdAndTenantIdAndDeletedFalse(p.getStoreId(), p.getTenantId()).orElse(null);
-    boolean visible =
-        Set.of(Domain.Role.ADMIN, Domain.Role.BUYER).contains(UserContext.get().role());
+    Domain.Role role = UserContext.get().role();
+    boolean storeNameVisible =
+        Set.of(Domain.Role.ADMIN, Domain.Role.OPERATOR, Domain.Role.BUYER).contains(role);
+    boolean storeLocationVisible = Set.of(Domain.Role.ADMIN, Domain.Role.BUYER).contains(role);
     return new ProductDto(
         p.getId(),
         p.getStoreId(),
@@ -192,8 +194,8 @@ public class CatalogController {
         p.getPrice(),
         p.isOnSale(),
         p.getTotalPurchasedQty(),
-        visible && s != null ? s.getName() : null,
-        visible && s != null ? s.getLocation() : null,
+        storeNameVisible && s != null ? s.getName() : null,
+        storeLocationVisible && s != null ? s.getLocation() : null,
         images.findByProductIdOrderBySortOrder(p.getId()).stream()
             .map(i -> media.url(i.getObjectKey()))
             .toList());
