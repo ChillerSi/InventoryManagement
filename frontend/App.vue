@@ -174,7 +174,7 @@ async function complete(o: any) {
   form.value = {
     ...form.value,
     qty: o.planQty,
-    actualPrice: 0,
+    actualPrice: Number(o.productPrice || 0),
     operatorRemark: o.operatorRemark || '',
     buyerRemark: o.buyerRemark || '',
   };
@@ -1054,7 +1054,7 @@ onBeforeUnmount(() => {
       /></label>
       <label v-if="dialog === 'complete'"
         ><p>实际采购单价</p>
-        <input v-model.number="form.actualPrice" type="number" step=".1"
+        <input v-model.number="form.actualPrice" type="number" min="0" step=".01"
       /></label>
       <label
         v-if="['buy', 'editOrder'].includes(dialog) && ['ADMIN', 'OPERATOR'].includes(user?.role)"
