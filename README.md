@@ -65,6 +65,10 @@ powershell -ExecutionPolicy Bypass -File .\scripts\windows\stop-local.ps1
 | Qdrant | http://localhost:6333 |
 | SigLIP | http://localhost:8000 |
 
+通过 HTTPS 代理访问时，`MINIO_ENDPOINT` 保持为后端可访问的 MinIO 内部地址，
+`MINIO_PUBLIC_ENDPOINT` 配置为浏览器可访问且证书有效的 HTTPS 地址，例如
+`https://frp-bar.com:64891`。后端只使用公开地址签发图片 URL，不通过它执行对象读写。
+
 ## 说明
 
 - 所有业务查询在服务端从登录 token 获取 `tenantId`，不信任客户端传入值。

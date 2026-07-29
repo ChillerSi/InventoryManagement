@@ -19,6 +19,12 @@ public class MediaService {
   @Value("${app.minio.endpoint}")
   String endpoint;
 
+  @Value("${app.minio.public-endpoint:}")
+  String publicEndpoint;
+
+  @Value("${app.minio.region:us-east-1}")
+  String region;
+
   @Value("${app.minio.access-key}")
   String access;
 
@@ -29,10 +35,19 @@ public class MediaService {
   String bucket;
 
   MinioClient client;
+  MinioClient publicClient;
 
   @PostConstruct
   void init() throws Exception {
     client = MinioClient.builder().endpoint(endpoint).credentials(access, secret).build();
+    String browserEndpoint =
+        publicEndpoint == null || publicEndpoint.isBlank() ? endpoint : publicEndpoint;
+    publicClient =
+        MinioClient.builder()
+            .endpoint(browserEndpoint)
+            .credentials(access, secret)
+            .region(region)
+            .build();
     if (!client.bucketExists(BucketExistsArgs.builder().bucket(bucket).build()))
       client.makeBucket(MakeBucketArgs.builder().bucket(bucket).build());
   }
@@ -61,7 +76,7 @@ public class MediaService {
   public String url(String key) {
     if (key == null) return null;
     try {
-      return client.getPresignedObjectUrl(
+      return publicClient.getPresignedObjectUrl(
           GetPresignedObjectUrlArgs.builder()
               .method(Method.GET)
               .bucket(bucket)
@@ -69,6 +84,7 @@ public class MediaService {
               .expiry(1, TimeUnit.HOURS)
               .build());
     } catch (Exception e) {
+      log.warn("MinIO 图片预签名地址生成失败: objectKey={}", key, e);
       return null;
     }
   }

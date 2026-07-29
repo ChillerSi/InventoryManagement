@@ -69,6 +69,8 @@ Start-LocalProcess "backend" 8080 "$runtimeRoot\java\jdk-21.0.11+10\bin\java.exe
         DB_USERNAME = "inventory"
         DB_PASSWORD = "inventory123"
         MINIO_ENDPOINT = "http://127.0.0.1:9000"
+        MINIO_PUBLIC_ENDPOINT = "https://frp-bar.com:64891"
+        MINIO_REGION = "us-east-1"
         MINIO_ACCESS_KEY = "minioadmin"
         MINIO_SECRET_KEY = "minioadmin"
         QDRANT_URL = "http://127.0.0.1:6333"
