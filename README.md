@@ -66,8 +66,10 @@ powershell -ExecutionPolicy Bypass -File .\scripts\windows\stop-local.ps1
 | SigLIP | http://localhost:8000 |
 
 通过 HTTPS 代理访问时，`MINIO_ENDPOINT` 保持为后端可访问的 MinIO 内部地址，
-`MINIO_PUBLIC_ENDPOINT` 配置为浏览器可访问且证书有效的 HTTPS 地址，例如
-`https://frp-bar.com:64891`。后端只使用公开地址签发图片 URL，不通过它执行对象读写。
+`MINIO_PUBLIC_ENDPOINT` 配置为浏览器访问前端使用的 HTTPS 域名，例如
+`https://frp-six.com`。前端服务器将 `/inventory-images/` 同域路径代理到 MinIO，
+后端只使用公开地址签发图片 URL，不通过它执行对象读写。代理必须保留原始 Host，
+否则 MinIO 无法通过预签名校验。
 
 ## 说明
 

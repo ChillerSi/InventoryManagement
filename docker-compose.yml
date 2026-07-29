@@ -40,7 +40,7 @@ services:
       DB_USERNAME: ${MYSQL_USER:-inventory}
       DB_PASSWORD: ${MYSQL_PASSWORD:-inventory123}
       MINIO_ENDPOINT: http://minio:9000
-      MINIO_PUBLIC_ENDPOINT: ${MINIO_PUBLIC_ENDPOINT:-}
+      MINIO_PUBLIC_ENDPOINT: ${MINIO_PUBLIC_ENDPOINT:-https://frp-six.com}
       MINIO_REGION: ${MINIO_REGION:-us-east-1}
       MINIO_ACCESS_KEY: ${MINIO_ROOT_USER:-minioadmin}
       MINIO_SECRET_KEY: ${MINIO_ROOT_PASSWORD:-minioadmin}
@@ -68,7 +68,7 @@ services:
   frontend:
     build: ./frontend
     ports: ["5173:80"]
-    depends_on: [backend]
+    depends_on: [backend, minio]
 volumes:
   mysql-data:
   minio-data:

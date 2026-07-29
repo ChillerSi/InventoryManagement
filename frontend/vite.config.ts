@@ -7,6 +7,10 @@ export default defineConfig({
     allowedHosts: ['frp-six.com'],
     proxy: {
       '/api': 'http://localhost:8080',
+      '/inventory-images': {
+        target: 'http://127.0.0.1:9000',
+        changeOrigin: false,
+      },
     },
   },
 });
