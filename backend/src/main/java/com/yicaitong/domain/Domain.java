@@ -5,6 +5,8 @@ import java.math.BigDecimal;
 import java.time.*;
 import java.util.*;
 import lombok.*;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 
 /** 集中定义当前 MVP 的持久化实体和稳定业务枚举。 */
 public final class Domain {
@@ -34,6 +36,7 @@ public final class Domain {
   public static class Tenant {
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)
+    @JdbcTypeCode(SqlTypes.CHAR)
     UUID id;
 
     @Column(nullable = false)
@@ -53,9 +56,11 @@ public final class Domain {
   public static class User {
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)
+    @JdbcTypeCode(SqlTypes.CHAR)
     UUID id;
 
     @Column(nullable = false)
+    @JdbcTypeCode(SqlTypes.CHAR)
     UUID tenantId;
 
     @Column(nullable = false)
@@ -87,9 +92,11 @@ public final class Domain {
     @Id String token;
 
     @Column(nullable = false)
+    @JdbcTypeCode(SqlTypes.CHAR)
     UUID userId;
 
     @Column(nullable = false)
+    @JdbcTypeCode(SqlTypes.CHAR)
     UUID tenantId;
 
     @Enumerated(EnumType.STRING)
@@ -107,9 +114,11 @@ public final class Domain {
   public static class Store {
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)
+    @JdbcTypeCode(SqlTypes.CHAR)
     UUID id;
 
     @Column(nullable = false)
+    @JdbcTypeCode(SqlTypes.CHAR)
     UUID tenantId;
 
     @Column(nullable = false)
@@ -131,12 +140,15 @@ public final class Domain {
   public static class Product {
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)
+    @JdbcTypeCode(SqlTypes.CHAR)
     UUID id;
 
     @Column(nullable = false)
+    @JdbcTypeCode(SqlTypes.CHAR)
     UUID tenantId;
 
     @Column(nullable = false)
+    @JdbcTypeCode(SqlTypes.CHAR)
     UUID storeId;
 
     @Column(nullable = false)
@@ -159,12 +171,15 @@ public final class Domain {
   public static class ProductImage {
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)
+    @JdbcTypeCode(SqlTypes.CHAR)
     UUID id;
 
     @Column(nullable = false)
+    @JdbcTypeCode(SqlTypes.CHAR)
     UUID tenantId;
 
     @Column(nullable = false)
+    @JdbcTypeCode(SqlTypes.CHAR)
     UUID productId;
 
     @Column(nullable = false)
@@ -184,21 +199,28 @@ public final class Domain {
   public static class PurchaseOrder {
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)
+    @JdbcTypeCode(SqlTypes.CHAR)
     UUID id;
 
     @Column(nullable = false)
+    @JdbcTypeCode(SqlTypes.CHAR)
     UUID tenantId;
 
     @Column(nullable = false)
+    @JdbcTypeCode(SqlTypes.CHAR)
     UUID productId;
 
     @Column(nullable = false)
+    @JdbcTypeCode(SqlTypes.CHAR)
     UUID storeId;
 
     @Column(nullable = false)
+    @JdbcTypeCode(SqlTypes.CHAR)
     UUID creatorUserId;
 
+    @JdbcTypeCode(SqlTypes.CHAR)
     UUID buyerUserId;
+
     int planQty;
     boolean urgent;
     Integer actualQty;
