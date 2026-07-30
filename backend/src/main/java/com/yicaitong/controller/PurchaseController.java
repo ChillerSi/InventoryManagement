@@ -186,7 +186,7 @@ public class PurchaseController {
             ? null
             : users.findById(o.getBuyerUserId()).map(Domain.User::getName).orElse("未知买手"),
         images.findByProductIdOrderBySortOrder(o.getProductId()).stream()
-            .map(image -> media.url(image.getObjectKey()))
+            .map(image -> media.productImageUrl(image.getId(), image.getTenantId()))
             .toList(),
         o.getStatus(),
         o.getCreatedAt(),

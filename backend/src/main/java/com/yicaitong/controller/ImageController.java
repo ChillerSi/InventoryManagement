@@ -63,7 +63,11 @@ public class ImageController {
     store.setStorefrontObjectKey(objectKey);
     stores.save(store);
     media.deleteQuietly(oldObjectKey);
-    return new StoreDto(store.getId(), store.getName(), store.getLocation(), media.url(objectKey));
+    return new StoreDto(
+        store.getId(),
+        store.getName(),
+        store.getLocation(),
+        media.storefrontUrl(store.getId(), store.getTenantId()));
   }
 
   /**

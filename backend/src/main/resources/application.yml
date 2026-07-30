@@ -35,11 +35,10 @@ logging:
 app:
   minio:
     endpoint: ${MINIO_ENDPOINT:http://localhost:9000}
-    public-endpoint: ${MINIO_PUBLIC_ENDPOINT:}
-    region: ${MINIO_REGION:us-east-1}
     access-key: ${MINIO_ACCESS_KEY:minioadmin}
     secret-key: ${MINIO_SECRET_KEY:minioadmin}
     bucket: inventory-images
+  media-signing-secret: ${MEDIA_SIGNING_SECRET:local-development-media-signing-secret-change-me}
   qdrant-url: ${QDRANT_URL:http://localhost:6333}
   embedding-url: ${EMBEDDING_URL:http://localhost:8000}
   embedding-model-version: ${SIGLIP_MODEL_VERSION:google/siglip2-base-patch16-224@75de2d55ec2d0b4efc50b3e9ad70dba96a7b2fa2}

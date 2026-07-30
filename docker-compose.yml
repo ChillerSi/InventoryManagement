@@ -40,10 +40,9 @@ services:
       DB_USERNAME: ${MYSQL_USER:-inventory}
       DB_PASSWORD: ${MYSQL_PASSWORD:-inventory123}
       MINIO_ENDPOINT: http://minio:9000
-      MINIO_PUBLIC_ENDPOINT: ${MINIO_PUBLIC_ENDPOINT:-https://frp-six.com}
-      MINIO_REGION: ${MINIO_REGION:-us-east-1}
       MINIO_ACCESS_KEY: ${MINIO_ROOT_USER:-minioadmin}
       MINIO_SECRET_KEY: ${MINIO_ROOT_PASSWORD:-minioadmin}
+      MEDIA_SIGNING_SECRET: ${MEDIA_SIGNING_SECRET:-local-development-media-signing-secret-change-me}
       QDRANT_URL: http://qdrant:6333
       EMBEDDING_URL: http://embedding-service:8000
       SIGLIP_MODEL_VERSION: ${SIGLIP_MODEL:-google/siglip2-base-patch16-224}@${SIGLIP_MODEL_REVISION:-75de2d55ec2d0b4efc50b3e9ad70dba96a7b2fa2}

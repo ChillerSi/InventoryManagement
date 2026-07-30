@@ -53,7 +53,12 @@ public class CatalogController {
         .map(
             s ->
                 new StoreDto(
-                    s.getId(), s.getName(), s.getLocation(), media.url(s.getStorefrontObjectKey())))
+                    s.getId(),
+                    s.getName(),
+                    s.getLocation(),
+                    s.getStorefrontObjectKey() == null
+                        ? null
+                        : media.storefrontUrl(s.getId(), s.getTenantId())))
         .toList();
   }
 
@@ -82,7 +87,9 @@ public class CatalogController {
         store.getId(),
         store.getName(),
         store.getLocation(),
-        media.url(store.getStorefrontObjectKey()));
+        store.getStorefrontObjectKey() == null
+            ? null
+            : media.storefrontUrl(store.getId(), store.getTenantId()));
   }
 
   /** 软删除店铺及其关联商品，保留采购单中的历史快照。 */
@@ -197,7 +204,7 @@ public class CatalogController {
         storeNameVisible && s != null ? s.getName() : null,
         storeLocationVisible && s != null ? s.getLocation() : null,
         images.findByProductIdOrderBySortOrder(p.getId()).stream()
-            .map(i -> media.url(i.getObjectKey()))
+            .map(i -> media.productImageUrl(i.getId(), i.getTenantId()))
             .toList());
   }
 }

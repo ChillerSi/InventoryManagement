@@ -65,11 +65,11 @@ powershell -ExecutionPolicy Bypass -File .\scripts\windows\stop-local.ps1
 | Qdrant | http://localhost:6333 |
 | SigLIP | http://localhost:8000 |
 
-通过 HTTPS 代理访问时，`MINIO_ENDPOINT` 保持为后端可访问的 MinIO 内部地址，
-`MINIO_PUBLIC_ENDPOINT` 配置为浏览器访问前端使用的 HTTPS 域名，例如
-`https://frp-six.com`。前端服务器将 `/inventory-images/` 同域路径代理到 MinIO，
-后端只使用公开地址签发图片 URL，不通过它执行对象读写。代理必须保留原始 Host，
-否则 MinIO 无法通过预签名校验。
+浏览器不直接访问 MinIO。业务接口返回一小时有效的 `/api/media/...` 相对签名地址，
+浏览器通过当前前端域名请求 Spring Boot；后端校验资源、租户、有效期和 HMAC 签名后，
+从私有 MinIO 读取并流式返回图片。这样通过 `https://frp-six.com` 访问时，图片与接口
+保持同源 HTTPS，也不会暴露 MinIO 地址、对象键或访问密钥。生产环境必须通过
+`MEDIA_SIGNING_SECRET` 配置独立的长随机密钥。
 
 ## 说明
 
