@@ -113,7 +113,16 @@ const api = async (path: string, options: any = {}) => {
       ...(user.value ? { Authorization: `Bearer ${user.value.token}` } : {}),
     },
   });
-  if (!r.ok) throw new Error((await r.json()).message);
+  if (!r.ok) {
+    let errorMessage = `请求失败（${r.status}）`;
+    try {
+      const errorBody = await r.json();
+      if (errorBody?.message) errorMessage = errorBody.message;
+    } catch {
+      // 非 JSON 错误响应保留包含 HTTP 状态码的通用提示。
+    }
+    throw new Error(errorMessage);
+  }
   return r.status === 204 ? null : r.json();
 };
 const notify = (s: string) => {
@@ -315,6 +324,14 @@ async function saveCompany(name: string) {
   notify('采购主体名称已保存');
 }
 async function submitDialog() {
+  try {
+    await submitDialogRequest();
+  } catch (error: any) {
+    notify(error?.message || '操作失败，请稍后重试');
+  }
+}
+
+async function submitDialogRequest() {
   if (dialog.value === 'buy' && activeProduct.value) {
     await api('/purchase-orders', {
       method: 'POST',

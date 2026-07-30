@@ -2,11 +2,13 @@ package com.yicaitong.controller;
 
 import com.yicaitong.domain.Domain;
 import com.yicaitong.domain.Domain.User;
+import com.yicaitong.exception.ApiException;
 import com.yicaitong.repository.TenantRepository;
 import com.yicaitong.repository.UserRepository;
 import com.yicaitong.security.UserContext;
 import java.util.*;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.*;
 
 record UserDto(
@@ -51,7 +53,7 @@ public class ProfileController {
         .findByLoginAccountIgnoreCase(in.account())
         .ifPresent(
             existing -> {
-              throw new IllegalArgumentException("登录账号已存在");
+              throw new ApiException(HttpStatus.CONFLICT, "登录账号已存在");
             });
     User u = new User();
     u.setTenantId(UserContext.get().tenantId());

@@ -1097,7 +1097,7 @@ nav b {
   color: white;
   padding: 10px 17px;
   border-radius: 25px;
-  z-index: 50;
+  z-index: 200;
 }
 .auth-screen {
   position: fixed;
