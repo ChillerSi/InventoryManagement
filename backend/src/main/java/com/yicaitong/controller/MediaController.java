@@ -8,7 +8,7 @@ import com.yicaitong.repository.ProductRepository;
 import com.yicaitong.repository.StoreRepository;
 import com.yicaitong.service.MediaService;
 import com.yicaitong.service.MediaService.MediaObject;
-import java.time.Duration;
+import java.time.ZoneOffset;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.CacheControl;
@@ -93,9 +93,9 @@ public class MediaController {
     return ResponseEntity.ok()
         .contentType(contentType)
         .contentLength(object.contentLength())
-        .cacheControl(CacheControl.maxAge(Duration.ofMinutes(55)).cachePrivate())
+        .cacheControl(CacheControl.noCache().cachePrivate())
         .header(HttpHeaders.ETAG, "\"" + object.etag() + "\"")
-        .lastModified(object.lastModified().toInstant())
+        .lastModified(object.lastModified().toInstant().atOffset(ZoneOffset.UTC).toInstant())
         .body(body);
   }
 }
